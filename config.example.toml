@@ -1,0 +1,40 @@
+# Copy to /etc/caddyban/config.toml and adjust values.
+
+[crawl]
+interval_secs = 86400
+timeout_secs = 10
+max_pages = 500
+max_depth = 5
+user_agent = "CaddyBan/0.1 (+https://github.com/your-org/caddyban)"
+
+[logs]
+format = "caddy" # caddy | nginx
+poll_interval_ms = 500
+
+[[sites]]
+name = "example"
+base_url = "https://example.com"
+log_path = "/var/log/caddy/example.com.access.log"
+extra_paths = ["/api/health", "/robots.txt", "/favicon.ico"]
+
+# Add more sites:
+# [[sites]]
+# name = "other"
+# base_url = "https://other.example"
+# log_path = "/var/log/caddy/other.example.access.log"
+
+[ban]
+threshold = 5
+window_secs = 60
+ban_duration_secs = 3600
+# dry_run = true
+
+[nft]
+# Production on NEVTENI: set lives inside inet filter (see examples/nftables/setup.nft)
+table = "inet filter"
+set = "blocked_ips"
+timeout = "1h"
+
+[whitelist]
+ips = ["127.0.0.1", "::1"]
+cidrs = ["10.0.0.0/8", "192.168.0.0/16"]

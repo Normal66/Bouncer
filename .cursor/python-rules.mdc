@@ -1,0 +1,80 @@
+---
+description: "Python rules (uv/ruff-first; FastAPI for HTTP) — KISS, production defaults 2026"
+globs: ["**/*.py", "pyproject.toml", "uv.lock", "requirements*.txt"]
+alwaysApply: false
+---
+
+# Scope
+- Эти правила для Python-кода. HTTP-секция — только для FastAPI/ASGI сервисов.
+- Не меняй код и зависимости без явного разрешения пользователя.
+- KISS: только необходимое. Без оверинжиниринга и лишних пакетов.
+- При конфликте с `universal-rules.mdc` приоритет у этого файла для `.py`.
+
+# Language & Toolchain
+- Новые проекты: Python 3.12+ (лучше 3.13+), единый `pyproject.toml`. Существующие — не апгрейдь без запроса.
+- Пакеты/venv: предпочитай `uv` (`uv sync`, `uv add`, `uv run`). Если в репо Poetry/pip — следуй репо, не мигрируй молча.
+- Lint/format: `ruff check` + `ruff format` (не тащи black/isort/flake8 параллельно без нужды).
+- Типы: type hints на публичных функциях; checker — тот, что в проекте (`pyright` / `mypy`). Не навязывай strict, если репо мягче.
+- Перед сдачей: `ruff check`, `ruff format --check`, typecheck (если настроен), `pytest`.
+
+# Architecture
+- Слои: handlers/API (тонкие) → services → repositories/adapters.
+- Структура пакетов — по бизнес-смыслу проекта; не навязывай `src/api|services|models`, если layout другой.
+- Точка входа тонкая: config, logging, app factory/serve, graceful shutdown.
+- Не плоди абстрактные DI-контейнеры «на вырост». Явные зависимости и простые фабрики предпочтительнее.
+
+# Error Handling
+- Исключения с понятным сообщением и контекстом; не голый `except:` / `except Exception: pass`.
+- Для библиотек/домена — узкие exception-типы; для application/plumbing — пробрасывай с контекстом (`raise ... from e`).
+- В HTTP API: доменные ошибки → стабильные 4xx; неожиданные → 500 без утечки internals клиенту (детали в лог).
+- Не используй `assert` для валидации прод-входа (в `-O` отключается).
+
+# Typing & Data Modeling
+- Аннотации параметров и return у публичного API модулей.
+- Модели/валидация на границе: Pydantic v2, если уже в стеке или это HTTP/DTO-слой.
+- Внутри домена допустимы `dataclass` / обычные классы — не оборачивай всё в Pydantic «на всякий случай».
+- Избегай `Any`, нетипизированных `dict` и `**kwargs` без причины.
+- Стиль JSON rename — как в существующем API; для нового зафиксируй один и держись его.
+
+# Concurrency & Async
+- `async` только для I/O. CPU-bound — в thread/process pool осознанно, не «весь код async».
+- Не блокируй event loop (`time.sleep`, тяжёлый sync I/O в async-пути).
+- HTTP-клиент: `httpx` (sync/async) с timeout; retry — по необходимости проекта.
+- Shared state: явный и минимальный; для request-scoped — `contextvars`, если уже принято.
+
+# Observability
+- Логи через `logging` или `structlog` в стиле репозитория; не `print` в прод-путях.
+- Уровни из env; structured fields где полезно.
+- Не логируй секреты, токены, пароли, лишние PII.
+
+# Web (FastAPI) — только для HTTP-сервисов
+- Роуты тонкие; бизнес-логика в services.
+- Вход/выход — typed models (Pydantic); Depends — для реального DI, не для всего подряд.
+- CORS: не `allow_origins=["*"]` в production.
+- Таймауты и лимиты размера тела — по необходимости.
+- Конфиг: простой и явный (env / pydantic-settings, если уже в проекте).
+- Shutdown: корректное закрытие пулов/клиентов в lifespan.
+
+# Testing
+- `pytest`; async — через принятый в проекте плагин (`anyio`/`pytest-asyncio`).
+- Unit рядом с логикой; integration — для границ (DB/API) точечно.
+- Не гонись за % coverage; тестируй поведение и регрессии.
+- HTTP: `TestClient` / `httpx.AsyncClient` + ASGI transport, без обязательного реального порта.
+
+# Security & Performance
+- Валидируй вход на границе.
+- Таймауты на outbound I/O.
+- Клиенту — безопасные сообщения; детали — в лог.
+- Не микрооптимизируй без измерений.
+
+# Dependencies
+- Не добавляй пакеты без запроса пользователя.
+- Не фиксируй minor/patch в rules — источник истины `pyproject.toml` / lockfile.
+- Предпочитай stdlib, затем уже используемый стек репозитория.
+- Не предлагай одновременно poetry+uv+pip как «обязательный» набор.
+
+# Agent Behavior
+- Отвечай по-русски, кратко и по делу.
+- Сначала план/объяснение; код — когда пользователь просит или это необходимо.
+- Не ломай работающую логику; минимальный diff.
+- Предлагай `uv add` / ruff-фиксы только как рекомендацию, не применяй молча.

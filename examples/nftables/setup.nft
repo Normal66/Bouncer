@@ -1,0 +1,19 @@
+#!/usr/sbin/nft -f
+# CaddyBan nftables — integrated into inet filter (NEVTENI-style).
+# Merge these blocks into /etc/nftables.conf; do not replace existing rules.
+#
+# Backup first:
+#   cp -a /etc/nftables.conf /etc/nftables.conf.bak.$(date +%Y%m%d%H%M%S)
+
+table inet filter {
+	set blocked_ips {
+		type ipv4_addr
+		flags timeout
+		timeout 1h
+	}
+
+	chain input {
+		# Add near the top of input (after established/lo):
+		# ip saddr @blocked_ips drop
+	}
+}

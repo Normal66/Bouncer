@@ -1,0 +1,82 @@
+---
+description: "Rust rules (Tokio-first; Axum for HTTP) — KISS, production defaults 2026"
+globs: ["**/*.rs", "Cargo.toml", "Cargo.lock"]
+alwaysApply: false
+---
+
+# Scope
+- Эти правила для Rust-кода. HTTP-секция применяется только к Axum/web сервисам.
+- Не меняй код и зависимости без явного разрешения пользователя.
+- KISS: только необходимое. Без оверинжиниринга и лишних крейтов.
+
+# Language & Toolchain
+- edition = "2024" для новых проектов; существующие — не мигрируй без запроса.
+- Идиоматичный Rust: ownership-first, snake_case, минимум unsafe (только с явным обоснованием).
+- Перед сдачей: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`.
+
+# Architecture
+- Слои: handlers (тонкие) → services → repositories/adapters.
+- Структура модулей — по бизнес-смыслу проекта; не навязывай фиксированный `api/services/models/shared`, если в репо уже другой layout.
+- `main.rs` — тонкий entry: config, tracing init, runtime/serve, graceful shutdown.
+- `lib.rs` — модули и публичный API крейта; без тяжёлой бизнес-логики «в простыне».
+- Тяжёлые зависимости (DB, облачные SDK) — через optional features, если это уже принято в проекте.
+
+# Error Handling
+- По умолчанию: `anyhow` + `.context()` / `.with_context()`.
+- В HTTP API на границе handler→response допустим типизированный `AppError` (`thiserror`) с `IntoResponse`:
+  - доменные варианты → стабильные 4xx/409 и т.п.
+  - `Internal(#[from] anyhow::Error)` / `#[error(transparent)]` → 500 без утечки internals клиенту.
+- Не используй `unwrap()`/`expect()` в прод-путях. Исключения: тесты, явно невозможные инварианты с понятным сообщением.
+- Не глотай ошибки: логируй с контекстом на границе (HTTP/job/CLI exit).
+
+# Concurrency & Async
+- Tokio-first. `#[tokio::main]` допустим; явный runtime — только если нужен custom config.
+- Shared state: предпочитай `Arc<AppState>` с Clone-клиентами/пулами внутри. Не делай глобальный mutable state по умолчанию.
+- `Mutex`/`RwLock`: держи критическую секцию короткой; **не удерживай lock через `.await`**.
+- Cancellation: `tokio::select!`, `timeout`, `CancellationToken` для background tasks.
+- Background tasks: `tokio::spawn` + отмена при shutdown; избегай `&'static` / `Box::leak` без крайней необходимости.
+- HTTP-сервер: graceful shutdown (`with_graceful_shutdown` + сигнал).
+
+# Data Modeling
+- Newtype для ID и «магических» примитивов, где путаница типов реальна.
+- Serde: `Serialize`/`Deserialize` по необходимости. Стиль rename (`camelCase` и т.д.) — как в существующем API; для нового API зафиксируй один стиль и держись его.
+- Валидация входа на границе (DTO/extractors). `validator` — опционально, не обязательный дефолт.
+- Не подключай `derive_builder` / `strum` / `itertools` «на всякий случай» — только если реально упрощают код.
+
+# Observability
+- Логи только через `tracing` (structured fields), не `println!`.
+- Инициализация: `tracing-subscriber` + `EnvFilter` (уровни из env).
+- Тяжёлые debug-дампы: только если уровень реально включён (`tracing::enabled!` или эквивалент).
+- Для HTTP: `tower-http` TraceLayer; желателен request-id (set/propagate).
+- Outbound HTTP: `reqwest` с timeout; retry/tracing middleware — по необходимости проекта.
+
+# Web (Axum) — только для HTTP-сервисов
+- Router + extractors: `Path`, `Query`, `Json`, `State`.
+- Middleware через `tower` / `tower-http`: trace, timeout, cors, compression — по необходимости.
+- CORS: не `Any` в production.
+- Ответы: осмысленный тип (`Json`, статус, доменный response). Plain text допустим для health/простых эндпоинтов.
+- Auth: extractors / `axum-extra` — в стиле текущего проекта.
+- Конфиг: простой и явный (env и/или файл). `config` crate — ок, если уже в проекте; не усложняй ради абстракции.
+
+# Testing
+- Unit-тесты рядом с кодом; integration — в `tests/`.
+- Async: `#[tokio::test]`.
+- HTTP: предпочитай тесты через `oneshot` / `ServiceExt`, без обязательного поднятия реального порта.
+- Benchmarks (`criterion`) — только если есть конкретная perf-задача.
+
+# Security & Performance
+- Валидируй вход; не логируй секреты/токены/PII.
+- Таймауты на inbound и outbound I/O.
+- Клиенту — безопасные сообщения об ошибках; детали — в лог.
+- Избегай лишних аллокаций в горячих путях; не микрооптимизируй без измерений.
+
+# Dependencies
+- Не добавляй крейты и features без запроса пользователя.
+- Не фиксируй minor/patch версии в правилах — источник истины `Cargo.toml`.
+- Предпочитай std, затем уже используемый стек репозитория.
+
+# Agent Behavior
+- Отвечай по-русски, кратко и по делу.
+- Сначала план/объяснение; код — когда пользователь просит или это необходимо для ответа.
+- Не ломай работающую логику; минимальный diff.
+- Предлагай `cargo add` / clippy-фиксы только как рекомендацию, не применяй молча.
