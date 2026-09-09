@@ -56,15 +56,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download amd64 artifact
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          merge-multiple: true
+          name: bouncer-linux-amd64
+          path: artifacts/bouncer-linux-amd64
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bouncer-linux-arm64
+          path: artifacts/bouncer-linux-arm64
 
       - name: Prepare release assets
         run: |
           mkdir -p dist
+          ls -laR artifacts/
           cp artifacts/bouncer-linux-amd64/bouncer dist/bouncer-linux-amd64
           cp artifacts/bouncer-linux-arm64/bouncer dist/bouncer-linux-arm64
           chmod 755 dist/*
