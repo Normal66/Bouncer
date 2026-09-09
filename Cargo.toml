@@ -1,8 +1,8 @@
 [package]
 name = "caddyban"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
-description = "Ban IPs probing non-existent pages via web server access logs and nftables"
+description = "Ban IPs probing web pages and SSH brute-force attempts via nftables"
 license = "LicenseRef-Proprietary"
 readme = "README.md"
 authors = ["CaddyBan Contributors"]

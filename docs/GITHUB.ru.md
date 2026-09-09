@@ -10,11 +10,10 @@
 - Git (Windows: [Git for Windows](https://git-scm.com/download/win))
 - [GitHub CLI](https://cli.github.com/) (`gh`) — опционально, но удобно
 
-Замените во всех командах:
+Репозиторий: **https://github.com/Normal66/CaddyBan**
 
 | Плейсхолдер | На что заменить |
 |-------------|-----------------|
-| `YOUR_USER` | ваш логин GitHub |
 | `YOUR_NAME` | ваше имя для git commit |
 | `your@email.com` | ваш email для git commit |
 
@@ -38,7 +37,7 @@
 
 ```bash
 gh auth login
-gh repo create YOUR_USER/caddyban --public --description "Ban IPs probing non-existent pages via Caddy/NGINX logs and nftables (Rust)"
+gh repo create Normal66/CaddyBan --public --description "Ban IPs probing web pages and SSH brute-force attempts via nftables (Rust)"
 ```
 
 ---
@@ -48,7 +47,7 @@ gh repo create YOUR_USER/caddyban --public --description "Ban IPs probing non-ex
 В PowerShell (Windows) или bash (Linux):
 
 ```bash
-cd F:\Develop\CaddyBan
+cd /path/to/CaddyBan
 
 git init
 git branch -M main
@@ -77,7 +76,7 @@ git commit -m "Initial release v0.1.0: multi-site log monitor with nftables bann
 ## Шаг 4. Привязать remote и push
 
 ```bash
-git remote add origin https://github.com/YOUR_USER/caddyban.git
+git remote add origin https://github.com/Normal66/CaddyBan.git
 git push -u origin main
 ```
 
@@ -87,13 +86,13 @@ git push -u origin main
 
 ## Шаг 5. Настройки репозитория на GitHub
 
-Откройте `https://github.com/YOUR_USER/caddyban/settings`
+Откройте `https://github.com/Normal66/CaddyBan/settings`
 
 ### About (справа на главной / Settings → General)
 
 **Description (EN):**
 ```
-Real-time Caddy/NGINX access log monitor. Bans IPs probing non-existent pages via nftables.
+Real-time monitor. Bans IPs probing web pages and SSH brute-force attempts via nftables.
 ```
 
 **Website:** (опционально) URL вашего сайта или docs
@@ -142,9 +141,11 @@ Settings → **Private vulnerability reporting** — включите, если 
 | `v1.0.0` | стабильный production-ready |
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0: initial release"
-git push origin v0.1.0
+git tag -a v0.3.0 -m "v0.3.0: SSH monitoring, instant invalid-user ban, install.sh"
+git push origin v0.3.0
 ```
+
+Push тега `v*` запускает `.github/workflows/release.yml` — сборка `caddyban-linux-amd64`, `caddyban-linux-arm64` и прикрепление `install.sh` к GitHub Release.
 
 Проверка:
 
@@ -159,42 +160,20 @@ git tag -l
 ### Через сайт
 
 1. **Releases → Create a new release**
-2. **Choose a tag:** `v0.1.0`
-3. **Release title:** `v0.1.0 — Initial release`
-4. **Description** — скопируйте блок ниже
+2. **Choose a tag:** `v0.3.0`
+3. **Release title:** `v0.3.0 — SSH ban + one-line installer`
+4. **Description** — секция `[0.3.0]` из [CHANGELOG.md](../CHANGELOG.md)
+
+Установка пользователями:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh | sudo bash
+```
 
 ### Через CLI
 
 ```bash
-gh release create v0.1.0 --title "v0.1.0 — Initial release" --notes-file CHANGELOG.md
-```
-
-### Текст release notes (copy-paste)
-
-```markdown
-## CaddyBan v0.1.0
-
-First public release.
-
-### Features
-- Multi-site support: `[[sites]]` with separate crawl catalog and log file per site
-- Real-time tail of Caddy JSON and NGINX combined access logs
-- Site crawler (startup + scheduled re-crawl)
-- Sliding window ban: configurable `threshold` and `window_secs`
-- nftables integration via `nft add element` with timeout
-- Whitelist IPs/CIDRs
-- Dry-run mode for testing
-- systemd unit included
-
-### Requirements
-- Linux, nftables, Rust 1.85+ (to build)
-- Caddy or NGINX with file access logs
-
-### Quick install
-See [README.md](README.md) or [README.ru.md](README.ru.md).
-
-### License
-Source Available — see [LICENSE](LICENSE). Contributions via PR to this repository only.
+gh release create v0.3.0 --title "v0.3.0 — SSH ban + one-line installer" --notes-file CHANGELOG.md
 ```
 
 5. **Publish release**
@@ -226,7 +205,7 @@ GitHub показывает `README.md` на главной. Русская ве
 Добавьте в README бейджи (опционально, после создания repo):
 
 ```markdown
-[![CI](https://github.com/YOUR_USER/caddyban/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USER/caddyban/actions/workflows/ci.yml)
+[![CI](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml)
 ```
 
 ---
@@ -281,7 +260,7 @@ gh release create v0.1.1 --title "v0.1.1" --notes "Bug fixes: ..."
 
 - [ ] `cargo test` проходит локально
 - [ ] `config.example.toml` без секретов и реальных IP
-- [ ] В README `YOUR_USER` / `your-org` заменены на ваш GitHub
+- [ ] Нет серверных конфигов и реальных IP в tracked-файлах
 - [ ] LICENSE и CONTRIBUTING.md на месте
 - [ ] `.gitignore` исключает `target/`
 - [ ] Проверен dry-run на сервере перед `dry_run = false`

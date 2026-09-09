@@ -6,7 +6,8 @@ labels: bug
 assignees: ''
 ---
 
-**Version:** <!-- e.g. v0.1.0 -->
+**Version:** <!-- e.g. v0.3.0 -->
+**Install method:** <!-- install.sh / manual / other -->
 **OS / distro:** <!-- e.g. Debian 13 -->
 **Web server:** <!-- Caddy / NGINX + version -->
 

@@ -1,9 +1,11 @@
 pub mod ban;
 pub mod config;
 pub mod crawler;
+pub mod journal_tailer;
 pub mod log_parser;
 pub mod log_tailer;
 pub mod nft;
+pub mod ssh_parser;
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -16,9 +18,11 @@ use tracing::{info, warn};
 use crate::ban::BanService;
 use crate::config::{Config, SiteEntry};
 use crate::crawler::{PathCatalog, crawl_site};
+use crate::journal_tailer::tail_journal_unit;
 use crate::log_parser::parse_line;
 use crate::log_tailer::tail_file;
 use crate::nft::NftBanClient;
+use crate::ssh_parser::parse_ssh_line;
 
 pub async fn run(config_path: &Path) -> Result<()> {
     let config = Config::load(config_path)?;
@@ -26,6 +30,7 @@ pub async fn run(config_path: &Path) -> Result<()> {
 
     let ban_service = BanService::new(
         config.ban.clone(),
+        config.ssh.clone(),
         config.whitelist.clone(),
         NftBanClient::new(config.nft.clone()),
     );
@@ -36,6 +41,10 @@ pub async fn run(config_path: &Path) -> Result<()> {
     for site in &config.sites {
         spawn_site(&config, site, ban_service.clone(), shutdown_tx.clone(), shutdown_rx.clone())
             .await?;
+    }
+
+    if config.ssh.enabled {
+        spawn_ssh(&config.ssh, ban_service.clone(), shutdown_rx.clone()).await?;
     }
 
     tokio::select! {
@@ -111,6 +120,31 @@ async fn spawn_site(
                 }
                 Ok(None) => {}
                 Err(err) => warn!(site = %site_label, error = %err, "failed to parse log line"),
+            }
+        }
+    });
+
+    Ok(())
+}
+
+async fn spawn_ssh(
+    ssh: &config::SshConfig,
+    ban_service: BanService,
+    shutdown_rx: watch::Receiver<bool>,
+) -> Result<()> {
+    let unit = ssh.unit.clone();
+    info!(unit = %unit, "ssh journal monitor started");
+
+    let mut journal_lines = tail_journal_unit(&unit, shutdown_rx)
+        .await
+        .with_context(|| format!("failed to tail journal unit {unit}"))?;
+
+    tokio::spawn(async move {
+        while let Some(line) = journal_lines.recv().await {
+            if let Some(event) = parse_ssh_line(&line) {
+                if let Err(err) = ban_service.handle_ssh_event(event).await {
+                    warn!(error = %err, "failed to process ssh journal entry");
+                }
             }
         }
     });

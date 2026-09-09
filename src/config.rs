@@ -11,6 +11,7 @@ pub struct Config {
     pub crawl: CrawlConfig,
     pub logs: LogsConfig,
     pub ban: BanConfig,
+    pub ssh: SshConfig,
     pub nft: NftConfig,
     pub whitelist: WhitelistConfig,
 }
@@ -83,6 +84,29 @@ pub enum LogFormat {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct SshConfig {
+    #[serde(default = "default_ssh_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_ssh_unit")]
+    pub unit: String,
+    #[serde(default = "default_ssh_threshold")]
+    pub threshold: u32,
+    #[serde(default = "default_ssh_window_secs")]
+    pub window_secs: u64,
+}
+
+impl Default for SshConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_ssh_enabled(),
+            unit: default_ssh_unit(),
+            threshold: default_ssh_threshold(),
+            window_secs: default_ssh_window_secs(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct BanConfig {
     #[serde(default = "default_threshold")]
     pub threshold: u32,
@@ -118,6 +142,8 @@ struct RawConfig {
     crawl: Option<CrawlConfig>,
     logs: RawLogsConfig,
     ban: BanConfig,
+    #[serde(default)]
+    ssh: SshConfig,
     nft: NftConfig,
     #[serde(default)]
     whitelist: WhitelistConfig,
@@ -226,6 +252,7 @@ impl RawConfig {
             crawl,
             logs,
             ban: self.ban,
+            ssh: self.ssh,
             nft: self.nft,
             whitelist: self.whitelist,
         })
@@ -249,7 +276,7 @@ fn default_max_depth() -> u32 {
 }
 
 fn default_user_agent() -> String {
-    "CaddyBan/0.1 (+https://github.com/your-org/caddyban)".into()
+    "CaddyBan/0.3 (+https://github.com/Normal66/CaddyBan)".into()
 }
 
 fn default_poll_interval_ms() -> u64 {
@@ -270,6 +297,22 @@ fn default_ban_duration_secs() -> u64 {
 
 fn default_dry_run() -> bool {
     false
+}
+
+fn default_ssh_enabled() -> bool {
+    false
+}
+
+fn default_ssh_unit() -> String {
+    "ssh".into()
+}
+
+fn default_ssh_threshold() -> u32 {
+    3
+}
+
+fn default_ssh_window_secs() -> u64 {
+    120
 }
 
 fn default_nft_timeout() -> String {

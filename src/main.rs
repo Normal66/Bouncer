@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "caddyban", about = "Ban IPs probing non-existent pages")]
+#[command(name = "caddyban", about = "Ban IPs probing web pages and SSH brute-force attempts")]
 struct Cli {
     #[arg(short, long, default_value = "/etc/caddyban/config.toml")]
     config: PathBuf,

@@ -1,5 +1,5 @@
 [Unit]
-Description=CaddyBan - ban IPs probing unknown pages
+Description=CaddyBan - ban probing web pages and SSH brute-force
 After=network-online.target nftables.service
 Wants=network-online.target
 

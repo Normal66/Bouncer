@@ -1,6 +1,11 @@
 # CaddyBan
 
-Real-time web access log monitor that bans IPs probing **non-existent pages** via **nftables**.
+[![CI](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml)
+
+Real-time monitor that bans malicious IPs via **nftables**:
+
+- **Web** — probes for non-existent pages (404 on unknown paths)
+- **SSH** — brute-force attempts (`Failed password`, `Invalid user` in systemd journal)
 
 Works with **Caddy** (JSON access log) and **NGINX** (combined log format). Supports **multiple sites** in one daemon.
 
@@ -14,11 +19,15 @@ Works with **Caddy** (JSON access log) and **NGINX** (combined log format). Supp
 2. **Scheduled re-crawl** — catalogs refresh on an interval (default: 24 h).
 3. **Log tailing** — each site's access log is tailed **from the end of the file** (new lines only).
 4. **Detection** — if an IP gets HTTP **404** for a path **not** in that site's catalog, hits accumulate in a sliding window.
-5. **Ban** — when `threshold` is reached within `window_secs`, the IP is added to an **nftables set** with timeout.
+5. **Ban** — when `threshold` is reached within `window_secs`, the IP is added to an **nftables set** with timeout (blocks **all** incoming traffic from that IP).
+6. **SSH** (optional) — follows `journalctl -f -u ssh` / `sshd`:
+   - `Invalid user … from IP` → **instant ban** (first attempt)
+   - `Failed password for root …` → sliding window (`threshold` / `window_secs`)
 
 ```
   [[sites]] ──► Crawler ──► Path catalog ◄── compare ── Log tailer ◄── access.log
                                               │
+  [ssh] journal ──► ssh_parser ───────────────┤
                                               ▼
                                         Ban service ──► nft add element ...
 ```
@@ -26,6 +35,16 @@ Works with **Caddy** (JSON access log) and **NGINX** (combined log format). Supp
 ### Why `threshold = 5` (not 1)?
 
 A single 404 can be a typo, broken link, or one bot probe. **Five 404s on unknown paths within ~2 minutes** looks like scanning. Tune in config — see [Ban tuning](#ban-tuning).
+
+### SSH: instant vs sliding window
+
+| Event in journal | Action |
+|------------------|--------|
+| `Invalid user lee from 203.0.113.10 …` | Ban immediately |
+| `Failed password for invalid user …` | Ban immediately |
+| `Failed password for root from …` | Wait for `threshold` (default 3) within `window_secs` |
+
+There is no legitimate reason to try random usernames on a production server.
 
 ### Initial crawl vs scheduled crawl
 
@@ -48,16 +67,53 @@ A single 404 can be a typo, broken link, or one bot probe. **Five 404s on unknow
 
 ## Quick start (copy-paste)
 
-### 1. Build
+### One-line install (recommended)
+
+On a Linux server with **Caddy** or **NGINX** and **nftables** (`inet filter` table):
 
 ```bash
-git clone https://github.com/YOUR_USER/caddyban.git
-cd caddyban
+curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh | sudo bash
+```
+
+The script will:
+
+1. Download the release binary (`linux-amd64` or `arm64`)
+2. Detect access log files and generate `/etc/caddyban/config.toml`
+3. Enable SSH monitoring if `ssh` / `sshd` is present
+4. Whitelist your IP from `$SSH_CONNECTION`
+5. Merge nftables rules (`blocked_ips` set + drop in `input`)
+6. Install systemd unit and start the service
+
+**Options:**
+
+```bash
+# Pin version, test without banning:
+curl -fsSL .../install.sh | sudo bash -s -- --version v0.3.0 --dry-run
+
+# Manual site when auto-detect finds nothing:
+curl -fsSL .../install.sh | sudo bash -s -- \
+  --site https://example.com --log /var/log/caddy/example.com.access.log
+
+# nftables already configured:
+curl -fsSL .../install.sh | sudo bash -s -- --skip-nft
+```
+
+After install, set `dry_run = false` in `/etc/caddyban/config.toml` and run `systemctl restart caddyban` when ready.
+
+---
+
+### Manual install
+
+#### 1. Build
+
+```bash
+git clone https://github.com/Normal66/CaddyBan.git
+cd CaddyBan
 cargo build --release
 sudo install -m 755 target/release/caddyban /usr/local/bin/caddyban
 ```
 
-### 2. nftables — merge into existing rules
+#### 2. nftables — merge into existing rules
 
 **Back up first:**
 
@@ -96,7 +152,7 @@ set = "blocked_ips"
 timeout = "1h"
 ```
 
-### 3. Configure
+#### 3. Configure
 
 ```bash
 sudo mkdir -p /etc/caddyban
@@ -133,6 +189,12 @@ threshold = 5
 window_secs = 120
 dry_run = true
 
+[ssh]
+enabled = true
+unit = "ssh"       # use "sshd" on RHEL/Fedora
+threshold = 3
+window_secs = 120
+
 [nft]
 table = "inet filter"
 set = "blocked_ips"
@@ -161,14 +223,14 @@ log {
 access_log /var/log/nginx/access.log combined;
 ```
 
-### 4. Test crawl
+#### 4. Test crawl
 
 ```bash
 caddyban --config /etc/caddyban/config.toml crawl
 # Output: [site-a] /  [site-a] /about.html  ...
 ```
 
-### 5. Dry run, then production
+#### 5. Dry run, then production
 
 Keep `dry_run = true`, run manually, watch journal:
 
@@ -178,7 +240,7 @@ sudo RUST_LOG=caddyban=info caddyban --config /etc/caddyban/config.toml run
 
 When satisfied, set `dry_run = false` and use systemd (step 6).
 
-### 6. systemd
+#### 6. systemd
 
 ```bash
 sudo cp systemd/caddyban.service /etc/systemd/system/
@@ -232,6 +294,11 @@ window_secs = 300
 | `[ban]` | `threshold` | `5` | 404 count before ban |
 | `[ban]` | `window_secs` | `60` | Sliding window |
 | `[ban]` | `dry_run` | `false` | Test without nft |
+| `[ssh]` | `enabled` | `false` | Monitor SSH journal |
+| `[ssh]` | `unit` | `ssh` | systemd unit (`ssh` or `sshd`) |
+| `[ssh]` | `threshold` | `3` | Failed **password** attempts before ban (valid usernames only) |
+| `[ssh]` | `window_secs` | `120` | SSH sliding window for failed passwords |
+| — | — | — | `Invalid user` → **instant ban** (no threshold) |
 | `[nft]` | `table` | — | e.g. `inet filter` |
 | `[nft]` | `set` | — | e.g. `blocked_ips` |
 | `[nft]` | `timeout` | `1h` | Ban duration in nft |
@@ -259,7 +326,11 @@ RUST_LOG=caddyban=debug caddyban run
 | Empty set, many 404s in file | Tailer reads **from EOF only** | Expected; only new lines count |
 | `failed to open` log file | Permissions / systemd sandbox | Use `SupplementaryGroups=caddy` (see unit) |
 | Ban not blocking traffic | Drop rule missing in `input` chain | Add `ip saddr @blocked_ips drop` |
-| Your IP banned | Admin traffic to probe URLs | Add IP to `[whitelist].ips` |
+| Your IP banned | Admin traffic or SSH typos | Add IP to `[whitelist].ips` |
+| SSH ban not triggering | Too few attempts after start | Lower `[ssh].threshold`; check `journalctl -u ssh` |
+| SSH unit not found | Wrong unit name on distro | Debian/Ubuntu: `ssh`; RHEL/Fedora: `sshd` |
+| `install.sh` fails on download | No GitHub Release yet | Push tag `v*` or pass `--version` |
+| `no sites detected` | Non-standard log paths | `--site URL --log PATH` |
 
 Check bans:
 
@@ -273,7 +344,8 @@ sudo journalctl -u caddyban | grep banned
 ## Project layout
 
 ```
-caddyban/
+CaddyBan/
+├── install.sh            # one-line installer (curl | bash)
 ├── src/                  # Rust source
 ├── config.example.toml   # example config
 ├── systemd/              # systemd unit

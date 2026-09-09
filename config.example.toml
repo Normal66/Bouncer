@@ -5,7 +5,7 @@ interval_secs = 86400
 timeout_secs = 10
 max_pages = 500
 max_depth = 5
-user_agent = "CaddyBan/0.1 (+https://github.com/your-org/caddyban)"
+user_agent = "CaddyBan/0.3 (+https://github.com/Normal66/CaddyBan)"
 
 [logs]
 format = "caddy" # caddy | nginx
@@ -29,8 +29,15 @@ window_secs = 60
 ban_duration_secs = 3600
 # dry_run = true
 
+[ssh]
+enabled = false
+unit = "ssh" # use "sshd" on RHEL/Fedora
+threshold = 3   # only for Failed password on existing usernames
+window_secs = 120
+# Invalid user → instant ban (no threshold)
+
 [nft]
-# Production on NEVTENI: set lives inside inet filter (see examples/nftables/setup.nft)
+# Merge set into your existing inet filter table (see examples/nftables/setup.nft)
 table = "inet filter"
 set = "blocked_ips"
 timeout = "1h"
