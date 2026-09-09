@@ -5,5 +5,4 @@ Cargo.lock
 .env
 .idea/
 .vscode/
-.cursor/
 deploy/
