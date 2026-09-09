@@ -4,8 +4,10 @@ pub mod crawler;
 pub mod journal_tailer;
 pub mod log_parser;
 pub mod log_tailer;
+pub mod mail_parser;
 pub mod nft;
 pub mod ssh_parser;
+pub mod web_rules;
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -21,6 +23,7 @@ use crate::crawler::{PathCatalog, crawl_site};
 use crate::journal_tailer::tail_journal_unit;
 use crate::log_parser::parse_line;
 use crate::log_tailer::tail_file;
+use crate::mail_parser::parse_mail_line;
 use crate::nft::NftBanClient;
 use crate::ssh_parser::parse_ssh_line;
 
@@ -30,7 +33,9 @@ pub async fn run(config_path: &Path) -> Result<()> {
 
     let ban_service = BanService::new(
         config.ban.clone(),
+        config.web.clone(),
         config.ssh.clone(),
+        config.mail.clone(),
         config.whitelist.clone(),
         NftBanClient::new(config.nft.clone()),
     );
@@ -51,6 +56,12 @@ pub async fn run(config_path: &Path) -> Result<()> {
 
     if config.ssh.enabled {
         spawn_ssh(&config.ssh, ban_service.clone(), shutdown_rx.clone()).await?;
+    }
+
+    if config.mail.enabled {
+        for unit in &config.mail.units {
+            spawn_mail_unit(unit, ban_service.clone(), shutdown_rx.clone()).await?;
+        }
     }
 
     tokio::select! {
@@ -131,8 +142,51 @@ async fn spawn_ssh(
     ban_service: BanService,
     shutdown_rx: watch::Receiver<bool>,
 ) -> Result<()> {
-    let unit = ssh.unit.clone();
-    info!(unit = %unit, "ssh journal monitor started");
+    spawn_journal_monitor(&ssh.unit, "ssh", shutdown_rx, move |line| {
+        let ban_service = ban_service.clone();
+        async move {
+            if let Some(event) = parse_ssh_line(&line)
+                && let Err(err) = ban_service.handle_ssh_event(event).await
+            {
+                warn!(error = %err, "failed to process ssh journal entry");
+            }
+        }
+    })
+    .await
+}
+
+async fn spawn_mail_unit(
+    unit: &str,
+    ban_service: BanService,
+    shutdown_rx: watch::Receiver<bool>,
+) -> Result<()> {
+    let unit_label = unit.to_owned();
+    spawn_journal_monitor(unit, "mail", shutdown_rx, move |line| {
+        let ban_service = ban_service.clone();
+        let unit_label = unit_label.clone();
+        async move {
+            if let Some(event) = parse_mail_line(&line)
+                && let Err(err) = ban_service.handle_mail_event(&unit_label, event).await
+            {
+                warn!(unit = %unit_label, error = %err, "failed to process mail journal entry");
+            }
+        }
+    })
+    .await
+}
+
+async fn spawn_journal_monitor<F, Fut>(
+    unit: &str,
+    kind: &str,
+    shutdown_rx: watch::Receiver<bool>,
+    handle_line: F,
+) -> Result<()>
+where
+    F: Fn(String) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = ()> + Send,
+{
+    let unit = unit.to_owned();
+    info!(unit = %unit, kind, "journal monitor started");
 
     let mut journal_lines = tail_journal_unit(&unit, shutdown_rx)
         .await
@@ -140,11 +194,7 @@ async fn spawn_ssh(
 
     tokio::spawn(async move {
         while let Some(line) = journal_lines.recv().await {
-            if let Some(event) = parse_ssh_line(&line)
-                && let Err(err) = ban_service.handle_ssh_event(event).await
-            {
-                warn!(error = %err, "failed to process ssh journal entry");
-            }
+            handle_line(line).await;
         }
     });
 

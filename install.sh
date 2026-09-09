@@ -16,6 +16,7 @@ NFT_TIMEOUT="${BOUNCER_NFT_TIMEOUT:-1h}"
 DRY_RUN=false
 SKIP_NFT=false
 ENABLE_SSH=true
+ENABLE_MAIL=true
 EXTRA_WHITELIST=()
 MANUAL_SITES=()
 
@@ -34,6 +35,7 @@ Options:
   --dry-run           Write config with ban.dry_run = true
   --skip-nft          Do not modify nftables
   --no-ssh            Disable SSH journal monitoring
+  --no-mail           Disable Postfix/Dovecot journal monitoring
   --whitelist IP      Add IP to whitelist (repeatable)
   --site URL --log PATH   Manual site (repeat pair)
   -h, --help          Show help
@@ -60,6 +62,10 @@ parse_args() {
 			;;
 		--no-ssh)
 			ENABLE_SSH=false
+			shift
+			;;
+		--no-mail)
+			ENABLE_MAIL=false
 			shift
 			;;
 		--whitelist)
@@ -141,6 +147,26 @@ detect_ssh_unit() {
 		return
 	fi
 	echo ""
+}
+
+mail_unit_available() {
+	local unit="$1"
+	if systemctl list-unit-files --type=service --no-pager 2>/dev/null | grep -q "^${unit}\.service"; then
+		if systemctl is-active --quiet "$unit" 2>/dev/null ||
+			systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+			return 0
+		fi
+	fi
+	return 1
+}
+
+detect_mail_units() {
+	local unit
+	for unit in postfix dovecot; do
+		if mail_unit_available "$unit"; then
+			echo "$unit"
+		fi
+	done
 }
 
 log_format_for_file() {
@@ -262,13 +288,25 @@ write_config() {
 	shift
 	local -a sites=("$@")
 
-	local ssh_unit ssh_enabled dry_run admin_ip
+	local ssh_unit ssh_enabled mail_enabled dry_run admin_ip
+	local -a mail_units=()
 	ssh_unit="$(detect_ssh_unit)"
 	if [[ "$ENABLE_SSH" == true && -n "$ssh_unit" ]]; then
 		ssh_enabled=true
 	else
 		ssh_enabled=false
 		[[ "$ENABLE_SSH" == true && -z "$ssh_unit" ]] && warn "SSH service unit not found; disabling [ssh]"
+	fi
+
+	while IFS= read -r unit; do
+		[[ -n "$unit" ]] && mail_units+=("$unit")
+	done < <(detect_mail_units)
+	if [[ "$ENABLE_MAIL" == true && ${#mail_units[@]} -gt 0 ]]; then
+		mail_enabled=true
+	else
+		mail_enabled=false
+		[[ "$ENABLE_MAIL" == true && ${#mail_units[@]} -eq 0 ]] &&
+			warn "Postfix/Dovecot not found; disabling [mail]"
 	fi
 
 	if [[ "$DRY_RUN" == true ]]; then
@@ -313,12 +351,58 @@ write_config() {
 		echo "ban_duration_secs = 3600"
 		echo "dry_run = ${dry_run}"
 		echo
+		echo "[web.probes]"
+		echo "enabled = true"
+		echo 'paths = ['
+		echo '  "/.env",'
+		echo '  "/.git/config",'
+		echo '  "/.git/HEAD",'
+		echo '  "/.aws/credentials",'
+		echo '  "/wp-login.php",'
+		echo '  "/wp-admin",'
+		echo '  "/xmlrpc.php",'
+		echo '  "/phpmyadmin",'
+		echo '  "/pma",'
+		echo '  "/admin/config.php",'
+		echo '  "/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php",'
+		echo '  "/config.json",'
+		echo '  "/actuator",'
+		echo '  "/server-status",'
+		echo ']'
+		echo
+		echo "[web.auth]"
+		echo "enabled = true"
+		echo 'prefixes = ["/admin", "/login", "/wp-login.php", "/wp-admin", "/api/login", "/api/auth", "/user/login"]'
+		echo "threshold = 5"
+		echo "window_secs = 60"
+		echo
 		echo "[ssh]"
 		echo "enabled = ${ssh_enabled}"
 		if [[ "$ssh_enabled" == true ]]; then
 			echo "unit = \"${ssh_unit}\""
 		else
 			echo 'unit = "ssh"'
+		fi
+		echo "threshold = 3"
+		echo "window_secs = 120"
+		echo
+		echo "[mail]"
+		echo "enabled = ${mail_enabled}"
+		if [[ "$mail_enabled" == true ]]; then
+			echo -n 'units = ['
+			local first=true unit
+			for unit in "${mail_units[@]}"; do
+				if [[ "$first" == true ]]; then
+					echo -n "\"${unit}\""
+					first=false
+				else
+					echo -n ", \"${unit}\""
+				fi
+			done
+			echo "]"
+			log "mail monitoring: ${mail_units[*]}"
+		else
+			echo 'units = []'
 		fi
 		echo "threshold = 3"
 		echo "window_secs = 120"

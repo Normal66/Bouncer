@@ -11,7 +11,9 @@ pub struct Config {
     pub crawl: CrawlConfig,
     pub logs: LogsConfig,
     pub ban: BanConfig,
+    pub web: WebConfig,
     pub ssh: SshConfig,
+    pub mail: MailConfig,
     pub nft: NftConfig,
     pub whitelist: WhitelistConfig,
 }
@@ -82,6 +84,77 @@ pub enum LogFormat {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct WebProbesConfig {
+    #[serde(default = "default_web_probes_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_probe_paths")]
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebAuthConfig {
+    #[serde(default = "default_web_auth_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_auth_prefixes")]
+    pub prefixes: Vec<String>,
+    #[serde(default = "default_threshold")]
+    pub threshold: u32,
+    #[serde(default = "default_window_secs")]
+    pub window_secs: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct WebConfig {
+    #[serde(default)]
+    pub probes: WebProbesConfig,
+    #[serde(default)]
+    pub auth: WebAuthConfig,
+}
+
+impl Default for WebProbesConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_web_probes_enabled(),
+            paths: default_probe_paths(),
+        }
+    }
+}
+
+impl Default for WebAuthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_web_auth_enabled(),
+            prefixes: default_auth_prefixes(),
+            threshold: default_threshold(),
+            window_secs: default_window_secs(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MailConfig {
+    #[serde(default = "default_mail_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub units: Vec<String>,
+    #[serde(default = "default_mail_threshold")]
+    pub threshold: u32,
+    #[serde(default = "default_mail_window_secs")]
+    pub window_secs: u64,
+}
+
+impl Default for MailConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_mail_enabled(),
+            units: Vec::new(),
+            threshold: default_mail_threshold(),
+            window_secs: default_mail_window_secs(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct SshConfig {
     #[serde(default = "default_ssh_enabled")]
     pub enabled: bool,
@@ -141,7 +214,11 @@ struct RawConfig {
     logs: RawLogsConfig,
     ban: BanConfig,
     #[serde(default)]
+    web: WebConfig,
+    #[serde(default)]
     ssh: SshConfig,
+    #[serde(default)]
+    mail: MailConfig,
     nft: NftConfig,
     #[serde(default)]
     whitelist: WhitelistConfig,
@@ -250,7 +327,9 @@ impl RawConfig {
             crawl,
             logs,
             ban: self.ban,
+            web: self.web,
             ssh: self.ssh,
+            mail: self.mail,
             nft: self.nft,
             whitelist: self.whitelist,
         })
@@ -295,6 +374,63 @@ fn default_ban_duration_secs() -> u64 {
 
 fn default_dry_run() -> bool {
     false
+}
+
+fn default_web_probes_enabled() -> bool {
+    true
+}
+
+fn default_web_auth_enabled() -> bool {
+    true
+}
+
+fn default_probe_paths() -> Vec<String> {
+    [
+        "/.env",
+        "/.git/config",
+        "/.git/HEAD",
+        "/.aws/credentials",
+        "/wp-login.php",
+        "/wp-admin",
+        "/xmlrpc.php",
+        "/phpmyadmin",
+        "/pma",
+        "/admin/config.php",
+        "/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php",
+        "/config.json",
+        "/actuator",
+        "/server-status",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
+}
+
+fn default_auth_prefixes() -> Vec<String> {
+    [
+        "/admin",
+        "/login",
+        "/wp-login.php",
+        "/wp-admin",
+        "/api/login",
+        "/api/auth",
+        "/user/login",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
+}
+
+fn default_mail_enabled() -> bool {
+    false
+}
+
+fn default_mail_threshold() -> u32 {
+    3
+}
+
+fn default_mail_window_secs() -> u64 {
+    120
 }
 
 fn default_ssh_enabled() -> bool {
@@ -345,6 +481,46 @@ mod tests {
         assert_eq!(cfg.sites.len(), 1);
         assert_eq!(cfg.logs.format, LogFormat::Caddy);
         assert_eq!(cfg.ban.threshold, 3);
+    }
+
+    #[test]
+    fn parses_web_and_mail_config() {
+        let raw = r#"
+            [logs]
+            format = "nginx"
+
+            [[sites]]
+            base_url = "https://example.com"
+            log_path = "/var/log/nginx/access.log"
+
+            [web.probes]
+            enabled = true
+            paths = ["/.env"]
+
+            [web.auth]
+            enabled = true
+            prefixes = ["/admin"]
+            threshold = 2
+
+            [mail]
+            enabled = true
+            units = ["postfix"]
+
+            [ban]
+
+            [nft]
+            table = "inet filter"
+            set = "blocked_ips"
+        "#;
+
+        let raw: RawConfig = toml::from_str(raw).expect("config should parse");
+        let cfg = raw.into_config().expect("web/mail config");
+        assert!(cfg.web.probes.enabled);
+        assert_eq!(cfg.web.probes.paths, vec!["/.env"]);
+        assert_eq!(cfg.web.auth.prefixes, vec!["/admin"]);
+        assert_eq!(cfg.web.auth.threshold, 2);
+        assert!(cfg.mail.enabled);
+        assert_eq!(cfg.mail.units, vec!["postfix"]);
     }
 
     #[test]

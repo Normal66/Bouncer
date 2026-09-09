@@ -29,12 +29,46 @@ window_secs = 60
 ban_duration_secs = 3600
 # dry_run = true
 
+[web.probes]
+enabled = true
+# Instant ban on known scanner paths (no crawl required)
+paths = [
+  "/.env",
+  "/.git/config",
+  "/.git/HEAD",
+  "/.aws/credentials",
+  "/wp-login.php",
+  "/wp-admin",
+  "/xmlrpc.php",
+  "/phpmyadmin",
+  "/pma",
+  "/admin/config.php",
+  "/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php",
+  "/config.json",
+  "/actuator",
+  "/server-status",
+]
+
+[web.auth]
+enabled = true
+# 401/403 on these path prefixes → threshold ban
+prefixes = ["/admin", "/login", "/wp-login.php", "/wp-admin", "/api/login", "/api/auth", "/user/login"]
+threshold = 5
+window_secs = 60
+
 [ssh]
 enabled = false
 unit = "ssh" # use "sshd" on RHEL/Fedora
 threshold = 3   # only for Failed password on existing usernames
 window_secs = 120
 # Invalid user → instant ban (no threshold)
+
+[mail]
+enabled = false
+units = ["postfix", "dovecot"] # only units listed here are monitored
+threshold = 3
+window_secs = 120
+# Unknown user / invalid recipient → instant ban
 
 [nft]
 # Merge set into your existing inet filter table (see examples/nftables/setup.nft)
