@@ -1,8 +1,11 @@
-# CaddyBan
+# Bouncer
 
-[![CI](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml)
+[![CI](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml)
 
-Real-time monitor that bans malicious IPs via **nftables**:
+> **One curl. Zero tolerance for scanners and SSH probes.**  
+> Your server's bouncer — drop intruders at the door via **nftables**.
+
+**Bouncer** bans malicious IPs before they reach your apps:
 
 - **Web** — probes for non-existent pages (404 on unknown paths)
 - **SSH** — brute-force attempts (`Failed password`, `Invalid user` in systemd journal)
@@ -15,7 +18,7 @@ Works with **Caddy** (JSON access log) and **NGINX** (combined log format). Supp
 
 ## How it works
 
-1. **Path catalog** — on startup CaddyBan crawls each configured site and builds a set of valid URL paths.
+1. **Path catalog** — on startup Bouncer crawls each configured site and builds a set of valid URL paths.
 2. **Scheduled re-crawl** — catalogs refresh on an interval (default: 24 h).
 3. **Log tailing** — each site's access log is tailed **from the end of the file** (new lines only).
 4. **Detection** — if an IP gets HTTP **404** for a path **not** in that site's catalog, hits accumulate in a sliding window.
@@ -54,6 +57,16 @@ There is no legitimate reason to try random usernames on a production server.
 | **Scheduled re-crawl** | **Recommended** (default 24 h) |
 | **`extra_paths` in config** | **Recommended** for API/SPA routes |
 
+### Why Bouncer (not fail2ban)?
+
+| | fail2ban | Bouncer |
+|---|----------|---------|
+| Install | jails, filters, Python | `curl \| bash` |
+| Web scanning | manual filters | auto crawl + 404 detection |
+| SSH `Invalid user` | needs custom filter | **instant ban** built-in |
+| Firewall | iptables / scripts | **nftables native** |
+| Binary | Python stack | single Rust binary |
+
 ---
 
 ## Requirements
@@ -72,13 +85,13 @@ There is no legitimate reason to try random usernames on a production server.
 On a Linux server with **Caddy** or **NGINX** and **nftables** (`inet filter` table):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash
 ```
 
 The script will:
 
 1. Download the release binary (`linux-amd64` or `arm64`)
-2. Detect access log files and generate `/etc/caddyban/config.toml`
+2. Detect access log files and generate `/etc/bouncer/config.toml`
 3. Enable SSH monitoring if `ssh` / `sshd` is present
 4. Whitelist your IP from `$SSH_CONNECTION`
 5. Merge nftables rules (`blocked_ips` set + drop in `input`)
@@ -88,7 +101,7 @@ The script will:
 
 ```bash
 # Pin version, test without banning:
-curl -fsSL .../install.sh | sudo bash -s -- --version v0.3.0 --dry-run
+curl -fsSL .../install.sh | sudo bash -s -- --version v1.0.0 --dry-run
 
 # Manual site when auto-detect finds nothing:
 curl -fsSL .../install.sh | sudo bash -s -- \
@@ -98,7 +111,7 @@ curl -fsSL .../install.sh | sudo bash -s -- \
 curl -fsSL .../install.sh | sudo bash -s -- --skip-nft
 ```
 
-After install, set `dry_run = false` in `/etc/caddyban/config.toml` and run `systemctl restart caddyban` when ready.
+After install, set `dry_run = false` in `/etc/bouncer/config.toml` and run `systemctl restart bouncer` when ready.
 
 ---
 
@@ -107,10 +120,10 @@ After install, set `dry_run = false` in `/etc/caddyban/config.toml` and run `sys
 #### 1. Build
 
 ```bash
-git clone https://github.com/Normal66/CaddyBan.git
-cd CaddyBan
+git clone https://github.com/Normal66/Bouncer.git
+cd Bouncer
 cargo build --release
-sudo install -m 755 target/release/caddyban /usr/local/bin/caddyban
+sudo install -m 755 target/release/bouncer /usr/local/bin/bouncer
 ```
 
 #### 2. nftables — merge into existing rules
@@ -155,9 +168,9 @@ timeout = "1h"
 #### 3. Configure
 
 ```bash
-sudo mkdir -p /etc/caddyban
-sudo cp config.example.toml /etc/caddyban/config.toml
-sudo nano /etc/caddyban/config.toml
+sudo mkdir -p /etc/bouncer
+sudo cp config.example.toml /etc/bouncer/config.toml
+sudo nano /etc/bouncer/config.toml
 ```
 
 **Multi-site example:**
@@ -226,7 +239,7 @@ access_log /var/log/nginx/access.log combined;
 #### 4. Test crawl
 
 ```bash
-caddyban --config /etc/caddyban/config.toml crawl
+bouncer --config /etc/bouncer/config.toml crawl
 # Output: [site-a] /  [site-a] /about.html  ...
 ```
 
@@ -235,7 +248,7 @@ caddyban --config /etc/caddyban/config.toml crawl
 Keep `dry_run = true`, run manually, watch journal:
 
 ```bash
-sudo RUST_LOG=caddyban=info caddyban --config /etc/caddyban/config.toml run
+sudo RUST_LOG=bouncer=info bouncer --config /etc/bouncer/config.toml run
 ```
 
 When satisfied, set `dry_run = false` and use systemd (step 6).
@@ -243,10 +256,10 @@ When satisfied, set `dry_run = false` and use systemd (step 6).
 #### 6. systemd
 
 ```bash
-sudo cp systemd/caddyban.service /etc/systemd/system/
+sudo cp systemd/bouncer.service /etc/systemd/system/bouncer.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now caddyban
-sudo journalctl -u caddyban -f
+sudo systemctl enable --now bouncer
+sudo journalctl -u bouncer -f
 ```
 
 The unit uses `SupplementaryGroups=caddy` so root can read Caddy log files (`640`).
@@ -311,9 +324,9 @@ Legacy single-site config (`[site]` + `[logs].path`) is still supported.
 ## CLI
 
 ```bash
-caddyban --config /etc/caddyban/config.toml run
-caddyban --config /etc/caddyban/config.toml crawl
-RUST_LOG=caddyban=debug caddyban run
+bouncer --config /etc/bouncer/config.toml run
+bouncer --config /etc/bouncer/config.toml crawl
+RUST_LOG=bouncer=debug bouncer run
 ```
 
 ---
@@ -336,7 +349,7 @@ Check bans:
 
 ```bash
 sudo nft list set inet filter blocked_ips
-sudo journalctl -u caddyban | grep banned
+sudo journalctl -u bouncer | grep banned
 ```
 
 ---
@@ -344,7 +357,7 @@ sudo journalctl -u caddyban | grep banned
 ## Project layout
 
 ```
-CaddyBan/
+Bouncer/
 ├── install.sh            # one-line installer (curl | bash)
 ├── src/                  # Rust source
 ├── config.example.toml   # example config
@@ -356,6 +369,20 @@ CaddyBan/
 ├── CONTRIBUTING.md
 └── LICENSE
 ```
+
+---
+
+## Migrating from CaddyBan
+
+If you ran the old **CaddyBan** on a server:
+
+```bash
+systemctl stop caddyban
+cp /etc/caddyban/config.toml /etc/bouncer/config.toml   # paths still valid
+curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash -s -- --skip-nft
+```
+
+Or copy config manually, install `bouncer` binary, use `systemd/bouncer.service`.
 
 ---
 

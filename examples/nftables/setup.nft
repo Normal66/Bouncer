@@ -1,5 +1,5 @@
 #!/usr/sbin/nft -f
-# CaddyBan nftables — merge into existing inet filter table.
+# Bouncer nftables — merge into existing inet filter table.
 # Merge these blocks into /etc/nftables.conf; do not replace existing rules.
 #
 # Backup first:

@@ -1,11 +1,11 @@
-# Copy to /etc/caddyban/config.toml and adjust values.
+# Copy to /etc/bouncer/config.toml and adjust values.
 
 [crawl]
 interval_secs = 86400
 timeout_secs = 10
 max_pages = 500
 max_depth = 5
-user_agent = "CaddyBan/0.3 (+https://github.com/Normal66/CaddyBan)"
+user_agent = "Bouncer/1.0 (+https://github.com/Normal66/Bouncer)"
 
 [logs]
 format = "caddy" # caddy | nginx

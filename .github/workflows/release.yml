@@ -18,10 +18,10 @@ jobs:
         include:
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            asset: caddyban-linux-amd64
+            asset: bouncer-linux-amd64
           - runner: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            asset: caddyban-linux-arm64
+            asset: bouncer-linux-arm64
             cross: true
     runs-on: ${{ matrix.runner }}
     steps:
@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: target/${{ matrix.target }}/release/caddyban
+          path: target/${{ matrix.target }}/release/bouncer
 
   release:
     needs: build
@@ -65,8 +65,8 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p dist
-          cp artifacts/caddyban-linux-amd64/caddyban dist/caddyban-linux-amd64
-          cp artifacts/caddyban-linux-arm64/caddyban dist/caddyban-linux-arm64
+          cp artifacts/bouncer-linux-amd64/bouncer dist/bouncer-linux-amd64
+          cp artifacts/bouncer-linux-arm64/bouncer dist/bouncer-linux-arm64
           chmod 755 dist/*
           ls -la dist/
 
@@ -74,7 +74,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/caddyban-linux-amd64
-            dist/caddyban-linux-arm64
+            dist/bouncer-linux-amd64
+            dist/bouncer-linux-arm64
             install.sh
           generate_release_notes: true

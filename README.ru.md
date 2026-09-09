@@ -1,8 +1,11 @@
-# CaddyBan
+# Bouncer
 
-[![CI](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml)
+[![CI](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml)
 
-Мониторинг в реальном времени с автоматическим баном IP через **nftables**:
+> **Один curl — сканеры и SSH-брутфорсеры не проходят.**  
+> Вышибала для сервера — бан через **nftables** до того, как дойдут до приложений.
+
+**Bouncer** автоматически банит вредоносные IP:
 
 - **Web** — запросы несуществующих страниц (404 на неизвестные пути)
 - **SSH** — брутфорс (`Failed password`, `Invalid user` в systemd journal)
@@ -47,6 +50,16 @@
 | **По расписанию** | **Рекомендуется** (24 ч) |
 | **`extra_paths`** | **Рекомендуется** для API/SPA |
 
+### Почему Bouncer (а не fail2ban)?
+
+| | fail2ban | Bouncer |
+|---|----------|---------|
+| Установка | jails, filters, Python | `curl \| bash` |
+| Web-сканирование | ручные фильтры | auto crawl + 404 |
+| SSH `Invalid user` | свой filter | **мгновенный бан** |
+| Firewall | iptables | **nftables native** |
+| Стек | Python | один Rust-бинарник |
+
 ---
 
 ## Требования
@@ -65,13 +78,13 @@
 На Linux-сервере с **Caddy** или **NGINX** и **nftables** (таблица `inet filter`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash
 ```
 
 Скрипт автоматически:
 
 1. Скачает бинарник из GitHub Release (`linux-amd64` / `arm64`)
-2. Найдёт access-логи и создаст `/etc/caddyban/config.toml`
+2. Найдёт access-логи и создаст `/etc/bouncer/config.toml`
 3. Включит мониторинг SSH, если есть unit `ssh` / `sshd`
 4. Добавит ваш IP из `$SSH_CONNECTION` в whitelist
 5. Настроит nftables (`blocked_ips` + drop в `input`)
@@ -81,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh |
 
 ```bash
 # Конкретная версия, тест без бана:
-curl -fsSL .../install.sh | sudo bash -s -- --version v0.3.0 --dry-run
+curl -fsSL .../install.sh | sudo bash -s -- --version v1.0.0 --dry-run
 
 # Ручной сайт, если auto-detect ничего не нашёл:
 curl -fsSL .../install.sh | sudo bash -s -- \
@@ -91,7 +104,7 @@ curl -fsSL .../install.sh | sudo bash -s -- \
 curl -fsSL .../install.sh | sudo bash -s -- --skip-nft
 ```
 
-После проверки установите `dry_run = false` в конфиге и `systemctl restart caddyban`.
+После проверки установите `dry_run = false` в конфиге и `systemctl restart bouncer`.
 
 ---
 
@@ -100,10 +113,10 @@ curl -fsSL .../install.sh | sudo bash -s -- --skip-nft
 #### 1. Сборка
 
 ```bash
-git clone https://github.com/Normal66/CaddyBan.git
-cd CaddyBan
+git clone https://github.com/Normal66/Bouncer.git
+cd Bouncer
 cargo build --release
-sudo install -m 755 target/release/caddyban /usr/local/bin/caddyban
+sudo install -m 755 target/release/bouncer /usr/local/bin/bouncer
 ```
 
 #### 2. nftables — влить в существующие правила
@@ -145,9 +158,9 @@ timeout = "1h"
 #### 3. Конфигурация
 
 ```bash
-sudo mkdir -p /etc/caddyban
-sudo cp config.example.toml /etc/caddyban/config.toml
-sudo nano /etc/caddyban/config.toml
+sudo mkdir -p /etc/bouncer
+sudo cp config.example.toml /etc/bouncer/config.toml
+sudo nano /etc/bouncer/config.toml
 ```
 
 **Multi-site:**
@@ -202,13 +215,13 @@ log {
 #### 4. Проверка обхода
 
 ```bash
-caddyban --config /etc/caddyban/config.toml crawl
+bouncer --config /etc/bouncer/config.toml crawl
 ```
 
 #### 5. Dry-run → production
 
 ```bash
-sudo RUST_LOG=caddyban=info caddyban --config /etc/caddyban/config.toml run
+sudo RUST_LOG=bouncer=info bouncer --config /etc/bouncer/config.toml run
 ```
 
 Затем `dry_run = false` и systemd.
@@ -216,10 +229,10 @@ sudo RUST_LOG=caddyban=info caddyban --config /etc/caddyban/config.toml run
 #### 6. systemd
 
 ```bash
-sudo cp systemd/caddyban.service /etc/systemd/system/
+sudo cp systemd/bouncer.service /etc/systemd/system/bouncer.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now caddyban
-sudo journalctl -u caddyban -f
+sudo systemctl enable --now bouncer
+sudo journalctl -u bouncer -f
 ```
 
 Unit содержит `SupplementaryGroups=caddy` — root читает логи Caddy (`640`).
@@ -274,9 +287,9 @@ window_secs = 300
 ## CLI
 
 ```bash
-caddyban --config /etc/caddyban/config.toml run
-caddyban --config /etc/caddyban/config.toml crawl
-RUST_LOG=caddyban=debug caddyban run
+bouncer --config /etc/bouncer/config.toml run
+bouncer --config /etc/bouncer/config.toml crawl
+RUST_LOG=bouncer=debug bouncer run
 ```
 
 ---
@@ -296,7 +309,7 @@ RUST_LOG=caddyban=debug caddyban run
 
 ```bash
 sudo nft list set inet filter blocked_ips
-sudo journalctl -u caddyban | grep banned
+sudo journalctl -u bouncer | grep banned
 ```
 
 ---
@@ -304,7 +317,7 @@ sudo journalctl -u caddyban | grep banned
 ## Структура проекта
 
 ```
-CaddyBan/
+Bouncer/
 ├── install.sh            # установка одной командой (curl | bash)
 ├── src/
 ├── config.example.toml

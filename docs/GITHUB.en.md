@@ -1,4 +1,4 @@
-# CaddyBan — Publishing to GitHub (copy-paste)
+# Bouncer — Publishing to GitHub (copy-paste)
 
 Step-by-step guide: from local project to repository, tag, and release.
 
@@ -10,7 +10,7 @@ Step-by-step guide: from local project to repository, tag, and release.
 - Git
 - [GitHub CLI](https://cli.github.com/) (`gh`) — optional but convenient
 
-Repository: **https://github.com/Normal66/CaddyBan**
+Repository: **https://github.com/Normal66/Bouncer**
 
 Replace in commands if needed:
 
@@ -26,10 +26,10 @@ Replace in commands if needed:
 ### Option A — via website
 
 1. [github.com/new](https://github.com/new)
-2. **Repository name:** `caddyban`
+2. **Repository name:** `bouncer`
 3. **Description:**
    ```
-   Ban IPs probing non-existent pages via Caddy/NGINX logs and nftables (Rust)
+   Server bouncer — ban web scanners & SSH brute-forcers via nftables. One curl install.
    ```
 4. **Public** or **Private** (Private recommended if you want to limit visibility)
 5. **Do NOT** check «Add README / .gitignore / license» — already in the project
@@ -39,7 +39,7 @@ Replace in commands if needed:
 
 ```bash
 gh auth login
-gh repo create Normal66/CaddyBan --public --description "Ban IPs probing web pages and SSH brute-force attempts via nftables (Rust)"
+gh repo create Normal66/Bouncer --public --description "Server bouncer — ban web scanners & SSH brute-forcers via nftables. One curl install."
 ```
 
 ---
@@ -47,7 +47,7 @@ gh repo create Normal66/CaddyBan --public --description "Ban IPs probing web pag
 ## Step 2. Initialize local git
 
 ```bash
-cd /path/to/CaddyBan
+cd /path/to/Bouncer
 
 git init
 git branch -M main
@@ -70,7 +70,7 @@ git commit -m "Initial release v0.1.0: multi-site log monitor with nftables bann
 ## Step 4. Add remote and push
 
 ```bash
-git remote add origin https://github.com/Normal66/CaddyBan.git
+git remote add origin https://github.com/Normal66/Bouncer.git
 git push -u origin main
 ```
 
@@ -80,13 +80,13 @@ Use a Personal Access Token when prompted (Settings → Developer settings → T
 
 ## Step 5. Repository settings on GitHub
 
-Open `https://github.com/Normal66/CaddyBan/settings`
+Open `https://github.com/Normal66/Bouncer/settings`
 
 ### About
 
 **Description:**
 ```
-Real-time monitor. Bans IPs probing web pages and SSH brute-force attempts via nftables.
+Server bouncer — one curl, zero tolerance for scanners and SSH probes. nftables native.
 ```
 
 **Topics:**
@@ -123,16 +123,16 @@ Full text is in [LICENSE](../LICENSE).
 | Tag | When |
 |-----|------|
 | `v0.1.0` | first public release |
-| `v0.3.0` | one-line `install.sh` + release binaries |
+| `v1.0.0` | one-line `install.sh` + release binaries |
 | `v0.2.0` | SSH brute-force detection |
 | `v1.0.0` | stable production |
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0: SSH monitoring, instant invalid-user ban, install.sh"
-git push origin v0.3.0
+git tag -a v1.0.0 -m "v1.0.0: SSH monitoring, instant invalid-user ban, install.sh"
+git push origin v1.0.0
 ```
 
-Pushing a `v*` tag triggers `.github/workflows/release.yml` — builds `caddyban-linux-amd64` and `caddyban-linux-arm64` and attaches `install.sh` to the GitHub Release.
+Pushing a `v*` tag triggers `.github/workflows/release.yml` — builds `bouncer-linux-amd64` and `bouncer-linux-arm64` and attaches `install.sh` to the GitHub Release.
 
 ---
 
@@ -141,20 +141,20 @@ Pushing a `v*` tag triggers `.github/workflows/release.yml` — builds `caddyban
 ### Via website
 
 1. **Releases → Create a new release**
-2. **Tag:** `v0.3.0`
-3. **Title:** `v0.3.0 — SSH ban + one-line installer`
+2. **Tag:** `v1.0.0`
+3. **Title:** `v1.0.0 — SSH ban + one-line installer`
 4. Paste release notes from [CHANGELOG.md](../CHANGELOG.md) section `[0.3.0]`
 
 Release workflow uploads Linux binaries automatically. Users install with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash
 ```
 
 ### Via CLI
 
 ```bash
-gh release create v0.3.0 --title "v0.3.0 — SSH ban + one-line installer" --notes-file CHANGELOG.md
+gh release create v1.0.0 --title "v1.0.0 — SSH ban + one-line installer" --notes-file CHANGELOG.md
 ```
 
 ---
@@ -170,7 +170,7 @@ Check the **Actions** tab after pushing.
 ## Step 9. README badges (optional)
 
 ```markdown
-[![CI](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml)
+[![CI](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml)
 ```
 
 ---

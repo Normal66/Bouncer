@@ -1,4 +1,4 @@
-# CaddyBan — публикация на GitHub (copy-paste)
+# Bouncer — публикация на GitHub (copy-paste)
 
 Пошаговая инструкция: от локального проекта до репозитория, тега и релиза.
 
@@ -10,7 +10,7 @@
 - Git (Windows: [Git for Windows](https://git-scm.com/download/win))
 - [GitHub CLI](https://cli.github.com/) (`gh`) — опционально, но удобно
 
-Репозиторий: **https://github.com/Normal66/CaddyBan**
+Репозиторий: **https://github.com/Normal66/Bouncer**
 
 | Плейсхолдер | На что заменить |
 |-------------|-----------------|
@@ -24,10 +24,10 @@
 ### Вариант A — через сайт
 
 1. [github.com/new](https://github.com/new)
-2. **Repository name:** `caddyban`
+2. **Repository name:** `bouncer`
 3. **Description:**
    ```
-   Ban IPs probing non-existent pages via Caddy/NGINX logs and nftables (Rust)
+   Server bouncer — ban web scanners & SSH brute-forcers via nftables. One curl install.
    ```
 4. **Public** или **Private** (для Source Available лучше **Private**, если не хотите fork)
 5. **НЕ** ставьте галочки «Add README / .gitignore / license» — всё уже в проекте
@@ -37,7 +37,7 @@
 
 ```bash
 gh auth login
-gh repo create Normal66/CaddyBan --public --description "Ban IPs probing web pages and SSH brute-force attempts via nftables (Rust)"
+gh repo create Normal66/Bouncer --public --description "Server bouncer — ban web scanners & SSH brute-forcers via nftables. One curl install."
 ```
 
 ---
@@ -47,7 +47,7 @@ gh repo create Normal66/CaddyBan --public --description "Ban IPs probing web pag
 В PowerShell (Windows) или bash (Linux):
 
 ```bash
-cd /path/to/CaddyBan
+cd /path/to/Bouncer
 
 git init
 git branch -M main
@@ -76,7 +76,7 @@ git commit -m "Initial release v0.1.0: multi-site log monitor with nftables bann
 ## Шаг 4. Привязать remote и push
 
 ```bash
-git remote add origin https://github.com/Normal66/CaddyBan.git
+git remote add origin https://github.com/Normal66/Bouncer.git
 git push -u origin main
 ```
 
@@ -86,13 +86,13 @@ git push -u origin main
 
 ## Шаг 5. Настройки репозитория на GitHub
 
-Откройте `https://github.com/Normal66/CaddyBan/settings`
+Откройте `https://github.com/Normal66/Bouncer/settings`
 
 ### About (справа на главной / Settings → General)
 
 **Description (EN):**
 ```
-Real-time monitor. Bans IPs probing web pages and SSH brute-force attempts via nftables.
+Server bouncer — one curl, zero tolerance for scanners and SSH probes. nftables native.
 ```
 
 **Website:** (опционально) URL вашего сайта или docs
@@ -141,11 +141,11 @@ Settings → **Private vulnerability reporting** — включите, если 
 | `v1.0.0` | стабильный production-ready |
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0: SSH monitoring, instant invalid-user ban, install.sh"
-git push origin v0.3.0
+git tag -a v1.0.0 -m "v1.0.0: SSH monitoring, instant invalid-user ban, install.sh"
+git push origin v1.0.0
 ```
 
-Push тега `v*` запускает `.github/workflows/release.yml` — сборка `caddyban-linux-amd64`, `caddyban-linux-arm64` и прикрепление `install.sh` к GitHub Release.
+Push тега `v*` запускает `.github/workflows/release.yml` — сборка `bouncer-linux-amd64`, `bouncer-linux-arm64` и прикрепление `install.sh` к GitHub Release.
 
 Проверка:
 
@@ -160,20 +160,20 @@ git tag -l
 ### Через сайт
 
 1. **Releases → Create a new release**
-2. **Choose a tag:** `v0.3.0`
-3. **Release title:** `v0.3.0 — SSH ban + one-line installer`
+2. **Choose a tag:** `v1.0.0`
+3. **Release title:** `v1.0.0 — SSH ban + one-line installer`
 4. **Description** — секция `[0.3.0]` из [CHANGELOG.md](../CHANGELOG.md)
 
 Установка пользователями:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Normal66/CaddyBan/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash
 ```
 
 ### Через CLI
 
 ```bash
-gh release create v0.3.0 --title "v0.3.0 — SSH ban + one-line installer" --notes-file CHANGELOG.md
+gh release create v1.0.0 --title "v1.0.0 — SSH ban + one-line installer" --notes-file CHANGELOG.md
 ```
 
 5. **Publish release**
@@ -205,7 +205,7 @@ GitHub показывает `README.md` на главной. Русская ве
 Добавьте в README бейджи (опционально, после создания repo):
 
 ```markdown
-[![CI](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/CaddyBan/actions/workflows/ci.yml)
+[![CI](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml/badge.svg)](https://github.com/Normal66/Bouncer/actions/workflows/ci.yml)
 ```
 
 ---
@@ -235,7 +235,7 @@ about: Report a problem
 
 **Expected:**
 
-**Logs:** `journalctl -u caddyban -n 50`
+**Logs:** `journalctl -u bouncer -n 50`
 ```
 
 ---

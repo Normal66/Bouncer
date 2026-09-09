@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn builds_timeout_element() {
         let cfg = NftConfig {
-            table: "inet caddyban".into(),
+            table: "inet filter".into(),
             set: "blocked_ips".into(),
             timeout: "30m".into(),
         };

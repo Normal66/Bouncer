@@ -276,7 +276,7 @@ fn default_max_depth() -> u32 {
 }
 
 fn default_user_agent() -> String {
-    "CaddyBan/0.3 (+https://github.com/Normal66/CaddyBan)".into()
+    "Bouncer/1.0 (+https://github.com/Normal66/Bouncer)".into()
 }
 
 fn default_poll_interval_ms() -> u64 {
@@ -338,7 +338,7 @@ mod tests {
             window_secs = 30
 
             [nft]
-            table = "inet caddyban"
+            table = "inet filter"
             set = "blocked_ips"
         "#;
 
@@ -370,7 +370,7 @@ mod tests {
             [ban]
 
             [nft]
-            table = "inet caddyban"
+            table = "inet filter"
             set = "blocked_ips"
         "#;
 

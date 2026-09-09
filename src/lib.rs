@@ -26,7 +26,7 @@ use crate::ssh_parser::parse_ssh_line;
 
 pub async fn run(config_path: &Path) -> Result<()> {
     let config = Config::load(config_path)?;
-    info!(sites = config.sites.len(), "caddyban started");
+    info!(sites = config.sites.len(), "bouncer started");
 
     let ban_service = BanService::new(
         config.ban.clone(),

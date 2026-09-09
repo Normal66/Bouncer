@@ -1,11 +1,11 @@
 [package]
-name = "caddyban"
-version = "0.3.0"
+name = "bouncer"
+version = "1.0.0"
 edition = "2024"
-description = "Ban IPs probing web pages and SSH brute-force attempts via nftables"
+description = "Server bouncer — ban web scanners and SSH brute-forcers via nftables"
 license = "LicenseRef-Proprietary"
 readme = "README.md"
-authors = ["CaddyBan Contributors"]
+authors = ["Bouncer Contributors"]
 
 [dependencies]
 anyhow = "1"

@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in CaddyBan.
+Thank you for your interest in Bouncer.
 
 ## How to contribute
 

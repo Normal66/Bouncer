@@ -1,5 +1,5 @@
 [Unit]
-Description=CaddyBan - ban probing web pages and SSH brute-force
+Description=Bouncer - server bouncer for web scanners and SSH brute-force
 After=network-online.target nftables.service
 Wants=network-online.target
 
@@ -8,7 +8,7 @@ Type=simple
 User=root
 Group=root
 SupplementaryGroups=caddy
-ExecStart=/usr/local/bin/caddyban --config /etc/caddyban/config.toml run
+ExecStart=/usr/local/bin/bouncer --config /etc/bouncer/config.toml run
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=10

@@ -5,9 +5,9 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "caddyban", about = "Ban IPs probing web pages and SSH brute-force attempts")]
+#[command(name = "bouncer", about = "Server bouncer — ban web scanners and SSH brute-forcers")]
 struct Cli {
-    #[arg(short, long, default_value = "/etc/caddyban/config.toml")]
+    #[arg(short, long, default_value = "/etc/bouncer/config.toml")]
     config: PathBuf,
 
     #[command(subcommand)]
@@ -16,7 +16,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run the ban daemon (default).
+    /// Run the bouncer daemon (default).
     Run,
     /// Crawl configured sites once and print discovered paths.
     Crawl,
@@ -25,14 +25,14 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("caddyban=info".parse()?))
+        .with_env_filter(EnvFilter::from_default_env().add_directive("bouncer=info".parse()?))
         .init();
 
     let cli = Cli::parse();
     match cli.command.unwrap_or(Commands::Run) {
-        Commands::Run => caddyban::run(&cli.config).await?,
+        Commands::Run => bouncer::run(&cli.config).await?,
         Commands::Crawl => {
-            let sites = caddyban::crawl_only(&cli.config).await?;
+            let sites = bouncer::crawl_only(&cli.config).await?;
             let site_count = sites.len();
             let mut total = 0usize;
             for (site, paths) in &sites {

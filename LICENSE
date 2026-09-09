@@ -1,33 +1,23 @@
-# Source Available License
+Copyright (c) 2026 Bouncer Authors. All Rights Reserved.
 
-Copyright (c) 2026 CaddyBan Authors. All Rights Reserved.
+Source Available License
 
-## Permissions
+This software and associated documentation files (the "Software") are
+proprietary. You may view and use the Software for personal or internal
+business purposes only, subject to the restrictions below.
 
-You may view and clone this repository for personal evaluation only.
+You may **not**, without prior written permission from the copyright holder:
 
-Contributions to the **official upstream repository** via pull request are
-welcome. By submitting a pull request, you grant the project maintainers a
-non-exclusive license to use your contribution in the project.
-
-## Restrictions
-
-Without prior written permission from the copyright holder, you may **not**:
-
-- fork this repository to publish a derivative or competing project
-- copy, modify, or redistribute the source code
+- redistribute, sublicense, or sell copies of the Software
 - use the software in production or commercial environments
+  beyond what is permitted by the copyright holder
+- create and maintain public forks for independent development
 - remove or alter copyright notices
 
-## No warranty
+Contributions to the official repository may be accepted under separate
+terms described in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+This license does **not** grant any license to use, modify, or deploy the code beyond what is
+explicitly permitted above.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-
-## Note on GitHub forks
-
-GitHub may allow creating a fork button on public repositories. Such forks do
-**not** grant any license to use, modify, or deploy the code beyond what is
-stated above. Unauthorized use may violate copyright law.
-
-For licensing inquiries or permission requests, open an issue in the official
-repository or contact the maintainer.
