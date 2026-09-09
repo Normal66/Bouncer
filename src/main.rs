@@ -5,7 +5,10 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "bouncer", about = "Server bouncer — ban web scanners and SSH brute-forcers")]
+#[command(
+    name = "bouncer",
+    about = "Server bouncer — ban web scanners and SSH brute-forcers"
+)]
 struct Cli {
     #[arg(short, long, default_value = "/etc/bouncer/config.toml")]
     config: PathBuf,

@@ -106,9 +106,7 @@ mod tests {
     #[test]
     fn parses_caddy_json() {
         let line = r#"{"request":{"uri":"/missing","remote_ip":"203.0.113.10"},"status":404}"#;
-        let entry = parse_line(LogFormat::Caddy, line)
-            .unwrap()
-            .expect("entry");
+        let entry = parse_line(LogFormat::Caddy, line).unwrap().expect("entry");
         assert_eq!(entry.ip, "203.0.113.10");
         assert_eq!(entry.path, "/missing");
         assert_eq!(entry.status, 404);
@@ -117,9 +115,7 @@ mod tests {
     #[test]
     fn parses_nginx_combined() {
         let line = r#"203.0.113.10 - - [26/Aug/2026:10:00:00 +0000] "GET /admin HTTP/1.1" 404 123 "-" "curl/8.0""#;
-        let entry = parse_line(LogFormat::Nginx, line)
-            .unwrap()
-            .expect("entry");
+        let entry = parse_line(LogFormat::Nginx, line).unwrap().expect("entry");
         assert_eq!(entry.ip, "203.0.113.10");
         assert_eq!(entry.path, "/admin");
         assert_eq!(entry.status, 404);

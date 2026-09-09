@@ -49,7 +49,9 @@ impl NftBanClient {
         };
         args.push(element);
 
-        run_nft(args).await.with_context(|| format!("ban IP {ip}"))?;
+        run_nft(args)
+            .await
+            .with_context(|| format!("ban IP {ip}"))?;
 
         self.banned.lock().await.insert(ip.to_owned());
         debug!(%ip, "nftables ban applied");

@@ -78,7 +78,11 @@ async fn read_from_offset(path: &Path, offset: &mut u64) -> Result<Vec<String>> 
 
     let size = file.metadata().await?.len();
     if size < *offset {
-        debug!(old_offset = *offset, new_size = size, "log file truncated, rewinding");
+        debug!(
+            old_offset = *offset,
+            new_size = size,
+            "log file truncated, rewinding"
+        );
         *offset = 0;
     }
 

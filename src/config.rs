@@ -28,9 +28,7 @@ pub struct SiteEntry {
 
 impl SiteEntry {
     pub fn label(&self) -> &str {
-        self.name
-            .as_deref()
-            .unwrap_or(self.base_url.as_str())
+        self.name.as_deref().unwrap_or(self.base_url.as_str())
     }
 
     pub fn crawl_config(&self, crawl: &CrawlConfig) -> SiteConfig {

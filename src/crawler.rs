@@ -73,7 +73,9 @@ pub async fn crawl_site(config: &SiteConfig) -> Result<HashSet<String>> {
             continue;
         }
 
-        let page_url = base.join(&path).with_context(|| format!("join base with {path}"))?;
+        let page_url = base
+            .join(&path)
+            .with_context(|| format!("join base with {path}"))?;
         debug!(%page_url, depth, "crawling page");
 
         let response = match client.get(page_url.clone()).send().await {
