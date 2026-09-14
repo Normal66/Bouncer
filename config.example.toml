@@ -71,7 +71,10 @@ window_secs = 120
 # Unknown user / invalid recipient → instant ban
 
 [nft]
-# Merge set into your existing inet filter table (see examples/nftables/setup.nft)
+# Bouncer only runs: nft add element <table> <set> { IP timeout … }
+# You must define the set + "ip saddr @blocked_ips drop" in nftables.conf
+# immediately after "ct state established,related accept" (before accept :22/:443).
+# See examples/nftables/setup.nft and examples/nftables/bouncer.nft
 table = "inet filter"
 set = "blocked_ips"
 timeout = "1h"

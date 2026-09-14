@@ -21,11 +21,12 @@ impl NftBanClient {
         }
     }
 
-    pub async fn ban_ip(&self, ip: &str) -> Result<()> {
+    /// Returns `true` if the IP was newly added to nftables, `false` if already banned in this process.
+    pub async fn ban_ip(&self, ip: &str) -> Result<bool> {
         {
             let banned = self.banned.lock().await;
             if banned.contains(ip) {
-                return Ok(());
+                return Ok(false);
             }
         }
 
@@ -55,7 +56,7 @@ impl NftBanClient {
 
         self.banned.lock().await.insert(ip.to_owned());
         debug!(%ip, "nftables ban applied");
-        Ok(())
+        Ok(true)
     }
 }
 

@@ -5,11 +5,6 @@ static SSH_INVALID_USER: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"Invalid user \S+ from (\S+) port \d+").expect("ssh invalid user regex")
 });
 
-static SSH_FAILED_PASSWORD_INVALID: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"Failed password for invalid user \S+ from (\S+) port \d+")
-        .expect("ssh failed password invalid user regex")
-});
-
 static SSH_FAILED_PASSWORD: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"Failed password for \S+ from (\S+) port \d+").expect("ssh failed password regex")
 });
@@ -32,11 +27,7 @@ pub fn parse_ssh_line(line: &str) -> Option<SshEvent> {
         });
     }
 
-    if let Some(caps) = SSH_FAILED_PASSWORD_INVALID.captures(line) {
-        return Some(SshEvent::InvalidUser {
-            ip: caps.get(1)?.as_str().to_owned(),
-        });
-    }
+    // "Failed password for invalid user …" follows "Invalid user …" on the same attempt — ignore duplicate.
 
     if let Some(caps) = SSH_FAILED_PASSWORD.captures(line) {
         return Some(SshEvent::FailedPassword {
@@ -74,14 +65,9 @@ mod tests {
     }
 
     #[test]
-    fn failed_password_invalid_user_is_instant_signal() {
+    fn failed_password_invalid_user_is_ignored() {
         let line = "Failed password for invalid user admin from 203.0.113.10 port 54321 ssh2";
-        assert_eq!(
-            parse_ssh_line(line),
-            Some(SshEvent::InvalidUser {
-                ip: "203.0.113.10".into()
-            })
-        );
+        assert_eq!(parse_ssh_line(line), None);
     }
 
     #[test]

@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-09-12
+
+### Fixed
+
+- Log «IP banned» only when IP is newly added to nftables (no spam on repeat events)
+- Ignore sshd line `Failed password for invalid user …` (duplicate of `Invalid user …`)
+- `install.sh`: persist drop rule early in `input` chain; `bouncer.nft` fragment is set-only
+
+### Changed
+
+- SSH: only `Invalid user …` triggers instant ban (v1.0.x also treated `Failed password for invalid user …` as instant)
+
+### Documentation
+
+- README (EN/RU): nftables rule order, troubleshooting, SSH table
+- [docs/NFTABLES.md](docs/NFTABLES.md), [examples/nftables/bouncer.nft](examples/nftables/bouncer.nft), expanded [examples/nftables/setup.nft](examples/nftables/setup.nft)
+
 ## [1.1.0] - 2026-09-09
 
 ### Added
@@ -34,5 +51,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash
 ```
 
+[1.1.1]: https://github.com/Normal66/Bouncer/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Normal66/Bouncer/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Normal66/Bouncer/releases/tag/v1.0.0

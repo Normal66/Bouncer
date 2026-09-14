@@ -1,9 +1,11 @@
 #!/usr/sbin/nft -f
-# Bouncer nftables — merge into existing inet filter table.
-# Merge these blocks into /etc/nftables.conf; do not replace existing rules.
+# Bouncer nftables — merge into /etc/nftables.conf (do not replace your whole firewall).
 #
-# Backup first:
+# Backup:
 #   cp -a /etc/nftables.conf /etc/nftables.conf.bak.$(date +%Y%m%d%H%M%S)
+#
+# Rule order matters: ip saddr @blocked_ips drop must run BEFORE accept rules for
+# :22, :80, :443 — otherwise banned IPs still reach sshd/Caddy.
 
 table inet filter {
 	set blocked_ips {
@@ -13,7 +15,22 @@ table inet filter {
 	}
 
 	chain input {
-		# Add near the top of input (after established/lo):
-		# ip saddr @blocked_ips drop
+		type filter hook input priority filter; policy drop;
+		iif "lo" accept
+		ct state invalid drop
+		ct state established,related accept
+		ip saddr @blocked_ips drop
+		tcp dport 22 ct state new limit rate 10/minute burst 20 packets accept
+		tcp dport 22 drop
+		tcp dport { 80, 443 } accept
+		icmp type echo-request limit rate 5/second accept
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+	}
+
+	chain output {
+		type filter hook output priority filter; policy accept;
 	}
 }

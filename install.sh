@@ -417,7 +417,7 @@ write_config() {
 		admin_ip="$(admin_ip_from_ssh)"
 		if [[ -n "$admin_ip" ]]; then
 			echo -n ", \"${admin_ip}\""
-			log "whitelisted admin IP from SSH_CONNECTION: ${admin_ip}"
+			log "whitelisted admin IP from SSH_CONNECTION: ${admin_ip}" >&2
 		fi
 		local ip
 		for ip in "${EXTRA_WHITELIST[@]}"; do
@@ -472,30 +472,34 @@ setup_nftables() {
 	local fragment="/etc/nftables.d/bouncer.nft"
 	local main_conf="/etc/nftables.conf"
 
-	if [[ ! -f "$fragment" ]]; then
-		mkdir -p /etc/nftables.d
-		cat >"$fragment" <<EOF
-# Bouncer — managed by install.sh
+	mkdir -p /etc/nftables.d
+	cat >"$fragment" <<EOF
+# Bouncer — set only (drop rule must be early in input chain, see install.sh)
 table inet filter {
 	set ${NFT_SET} {
 		type ipv4_addr
 		flags timeout
 		timeout ${NFT_TIMEOUT}
 	}
-
-	chain input {
-		ip saddr @${NFT_SET} drop
-	}
 }
 EOF
-		log "wrote ${fragment}"
-	fi
+	log "wrote ${fragment}"
 
-	if [[ -f "$main_conf" ]] && ! grep -q 'bouncer.nft' "$main_conf"; then
-		cp -a "$main_conf" "${main_conf}.bak.bouncer.$(date +%Y%m%d%H%M%S)"
-		printf '\ninclude "/etc/nftables.d/bouncer.nft"\n' >>"$main_conf"
-		nft -c -f "$main_conf" || die "nftables config check failed after adding include"
-		log "added include to ${main_conf}"
+	if [[ -f "$main_conf" ]]; then
+		if ! grep -q '@'"${NFT_SET}" "$main_conf"; then
+			cp -a "$main_conf" "${main_conf}.bak.bouncer.$(date +%Y%m%d%H%M%S)"
+			if grep -q 'established,related accept' "$main_conf"; then
+				sed -i '/established,related accept/a\\t\tip saddr @'"${NFT_SET}"' drop' "$main_conf"
+				log "inserted drop rule after established,related in ${main_conf}"
+			else
+				warn "add 'ip saddr @${NFT_SET} drop' near top of input chain in ${main_conf}"
+			fi
+		fi
+		if ! grep -q 'bouncer.nft' "$main_conf" && ! grep -q "set ${NFT_SET}" "$main_conf"; then
+			printf '\ninclude "/etc/nftables.d/bouncer.nft"\n' >>"$main_conf"
+			log "added include to ${main_conf}"
+		fi
+		nft -c -f "$main_conf" 2>/dev/null || warn "nftables config check failed; fix ${main_conf} manually"
 	fi
 
 	nft_set_exists || die "failed to configure nft set ${NFT_SET}"

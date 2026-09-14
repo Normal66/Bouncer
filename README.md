@@ -12,7 +12,7 @@
 
 Works with **Caddy** (JSON access log) and **NGINX** (combined log format). Supports **multiple sites** in one daemon.
 
-**Docs:** [README.ru.md](README.ru.md) · [GitHub publish guide (EN)](docs/GITHUB.en.md) · [GitHub publish guide (RU)](docs/GITHUB.ru.md)
+**Docs:** [README.ru.md](README.ru.md) · [nftables](docs/NFTABLES.md) · [GitHub publish (EN)](docs/GITHUB.en.md) · [GitHub publish (RU)](docs/GITHUB.ru.md)
 
 ---
 
@@ -25,6 +25,7 @@ Works with **Caddy** (JSON access log) and **NGINX** (combined log format). Supp
 5. **Ban** — when `threshold` is reached within `window_secs`, the IP is added to an **nftables set** with timeout (blocks **all** incoming traffic from that IP).
 6. **SSH** (optional) — follows `journalctl -f -u ssh` / `sshd`:
    - `Invalid user … from IP` → **instant ban** (first attempt)
+   - `Failed password for invalid user …` → **ignored** (duplicate line from sshd)
    - `Failed password for root …` → sliding window (`threshold` / `window_secs`)
 
 ```
@@ -43,8 +44,8 @@ A single 404 can be a typo, broken link, or one bot probe. **Five 404s on unknow
 
 | Event in journal | Action |
 |------------------|--------|
-| `Invalid user lee from 203.0.113.10 …` | Ban immediately |
-| `Failed password for invalid user …` | Ban immediately |
+| `Invalid user lee from 203.0.113.10 …` | Ban immediately (one log line per IP) |
+| `Failed password for invalid user …` | Ignored (duplicate of `Invalid user` on same attempt) |
 | `Failed password for root from …` | Wait for `threshold` (default 3) within `window_secs` |
 
 There is no legitimate reason to try random usernames on a production server.
@@ -94,7 +95,7 @@ The script will:
 2. Detect access log files and generate `/etc/bouncer/config.toml`
 3. Enable SSH monitoring if `ssh` / `sshd` is present
 4. Whitelist your IP from `$SSH_CONNECTION`
-5. Merge nftables rules (`blocked_ips` set + drop in `input`)
+5. Configure nftables: `blocked_ips` set + `ip saddr @blocked_ips drop` **early** in `input` (see [nftables rule order](#nftables-rule-order))
 6. Install systemd unit and start the service
 
 **Options:**
@@ -143,11 +144,23 @@ set blocked_ips {
     timeout 1h
 }
 
-# Inside chain input (after established,related and lo):
+# Inside chain input — right after established,related (before accept :22/:443):
 ip saddr @blocked_ips drop
 ```
 
-Example full structure — see [examples/nftables/setup.nft](examples/nftables/setup.nft).
+Example full structure — [examples/nftables/setup.nft](examples/nftables/setup.nft).  
+Set-only fragment for `include` — [examples/nftables/bouncer.nft](examples/nftables/bouncer.nft) (drop rule stays in main `input` chain).
+
+### nftables rule order
+
+Bouncer runtime only runs `nft add element … blocked_ips { IP }`. **Firewall drop must exist in config** and match **before** port-specific `accept` rules:
+
+```bash
+sudo nft -a list chain inet filter input
+# expect: ip saddr @blocked_ips drop  (handle lower than accept :22 / :443)
+```
+
+Putting `drop` in a separate `include` file as a second `chain input { … }` block appends it at the **end** — banned IPs still reach SSH and HTTP. `install.sh` inserts the drop line after `established,related accept` in `/etc/nftables.conf` and writes a set-only `/etc/nftables.d/bouncer.nft`.
 
 Apply and verify:
 
@@ -338,7 +351,8 @@ RUST_LOG=bouncer=debug bouncer run
 | Empty `blocked_ips` set | No new qualifying traffic since start | Normal; wait for scanners or lower `threshold` |
 | Empty set, many 404s in file | Tailer reads **from EOF only** | Expected; only new lines count |
 | `failed to open` log file | Permissions / systemd sandbox | Use `SupplementaryGroups=caddy` (see unit) |
-| Ban not blocking traffic | Drop rule missing in `input` chain | Add `ip saddr @blocked_ips drop` |
+| Ban not blocking traffic | Drop rule after accept `:22/:443` | Add `ip saddr @blocked_ips drop` right after `established,related accept` |
+| Repeated `IP banned` for same IP | New sshd/journal lines after ban | Normal since v1.1.1: only **first** ban is logged; check `nft list set` |
 | Your IP banned | Admin traffic or SSH typos | Add IP to `[whitelist].ips` |
 | SSH ban not triggering | Too few attempts after start | Lower `[ssh].threshold`; check `journalctl -u ssh` |
 | SSH unit not found | Wrong unit name on distro | Debian/Ubuntu: `ssh`; RHEL/Fedora: `sshd` |
@@ -362,7 +376,8 @@ Bouncer/
 ├── src/                  # Rust source
 ├── config.example.toml   # example config
 ├── systemd/              # systemd unit
-├── examples/nftables/    # nftables snippet
+├── examples/nftables/    # setup.nft (full example), bouncer.nft (set-only)
+├── docs/NFTABLES.md      # firewall set + rule order
 ├── docs/GITHUB.en.md     # GitHub publish guide
 ├── docs/GITHUB.ru.md
 ├── CHANGELOG.md

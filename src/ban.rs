@@ -185,8 +185,9 @@ impl BanService {
             return Ok(());
         }
 
-        self.nft.ban_ip(ip).await?;
-        info!(source, ip = %ip, detail, "{message}");
+        if self.nft.ban_ip(ip).await? {
+            info!(source, ip = %ip, detail, "{message}");
+        }
         Ok(())
     }
 
@@ -224,8 +225,9 @@ impl BanService {
             return Ok(());
         }
 
-        self.nft.ban_ip(ip).await?;
-        info!(source, ip = %ip, hits = count, reason, "IP banned");
+        if self.nft.ban_ip(ip).await? {
+            info!(source, ip = %ip, hits = count, reason, "IP banned");
+        }
         Ok(())
     }
 

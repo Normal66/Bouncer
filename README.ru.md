@@ -12,7 +12,7 @@
 
 Поддержка **Caddy** (JSON), **NGINX** (combined), **нескольких сайтов** в одном процессе.
 
-**Документация:** [README.md](README.md) · [Публикация на GitHub (RU)](docs/GITHUB.ru.md) · [GitHub publish (EN)](docs/GITHUB.en.md)
+**Документация:** [README.md](README.md) · [nftables](docs/NFTABLES.md) · [Публикация на GitHub (RU)](docs/GITHUB.ru.md) · [GitHub publish (EN)](docs/GITHUB.en.md)
 
 ---
 
@@ -26,14 +26,15 @@
 
 6. **SSH** (опционально) — `journalctl -f -u ssh` / `sshd`:
    - `Invalid user … from IP` → **мгновенный бан** (с первой попытки)
+   - `Failed password for invalid user …` → **игнор** (дубликат строки sshd)
    - `Failed password for root …` → скользящее окно (`threshold` / `window_secs`)
 
 ### SSH: мгновенно vs окно
 
 | Событие в journal | Действие |
 |-------------------|----------|
-| `Invalid user lee from 203.0.113.10 …` | Бан сразу |
-| `Failed password for invalid user …` | Бан сразу |
+| `Invalid user lee from 203.0.113.10 …` | Бан сразу (одна строка в логе на IP) |
+| `Failed password for invalid user …` | Игнор (дубликат `Invalid user` в той же попытке) |
 | `Failed password for root from …` | Ждём `threshold` (по умолчанию 3) за `window_secs` |
 
 Случайного перебора несуществующих пользователей на проде не бывает.
@@ -87,7 +88,7 @@ curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | 
 2. Найдёт access-логи и создаст `/etc/bouncer/config.toml`
 3. Включит мониторинг SSH, если есть unit `ssh` / `sshd`
 4. Добавит ваш IP из `$SSH_CONNECTION` в whitelist
-5. Настроит nftables (`blocked_ips` + drop в `input`)
+5. Настроит nftables: set `blocked_ips` + drop **в начале** `input` (см. [Порядок правил nftables](#порядок-правил-nftables))
 6. Установит systemd unit и запустит сервис
 
 **Опции:**
@@ -136,11 +137,23 @@ set blocked_ips {
     timeout 1h
 }
 
-# В chain input (после established,related и lo):
+# В chain input — сразу после established,related (до accept :22/:443):
 ip saddr @blocked_ips drop
 ```
 
-Пример — [examples/nftables/setup.nft](examples/nftables/setup.nft).
+Пример — [examples/nftables/setup.nft](examples/nftables/setup.nft).  
+Fragment только set — [examples/nftables/bouncer.nft](examples/nftables/bouncer.nft) (drop остаётся в основном `input`).
+
+### Порядок правил nftables
+
+Runtime: только `nft add element … blocked_ips { IP }`. **Drop в конфиге** и **до** `accept` на `:22`/`:443`:
+
+```bash
+sudo nft -a list chain inet filter input
+# ожидается: ip saddr @blocked_ips drop (handle меньше, чем у accept :22 / :443)
+```
+
+Отдельный `include` с вторым блоком `chain input { drop }` дописывает правило **в конец** — бан не режет SSH/HTTP. `install.sh` вставляет drop после `established,related accept` в `/etc/nftables.conf` и пишет set-only `/etc/nftables.d/bouncer.nft`.
 
 ```bash
 sudo nft -c -f /etc/nftables.conf && sudo nft -f /etc/nftables.conf
@@ -301,7 +314,8 @@ RUST_LOG=bouncer=debug bouncer run
 | Set `blocked_ips` пуст | Нет новых событий после старта | Норма; подождать или снизить `threshold` |
 | Много 404 в файле, банов нет | Tail только с EOF | Только новые строки |
 | `failed to open` log | Права / sandbox | `SupplementaryGroups=caddy` в unit |
-| Бан не блокирует | Нет `drop` в input | Добавить `ip saddr @blocked_ips drop` |
+| Бан не блокирует | `drop` после accept `:22/:443` | `ip saddr @blocked_ips drop` **сразу после** `established,related accept` |
+| Повторный `IP banned` для того же IP | Новые строки journal после бана | С v1.1.1 в лог пишется только **первый** бан; смотрите `nft list set` |
 | Забанили себя | Свои probe-запросы или опечатки SSH | IP в `[whitelist].ips` |
 | SSH-бан не срабатывает | Мало попыток после старта | Снизить `[ssh].threshold`; проверить `journalctl -u ssh` |
 | `install.sh` — ошибка download | Нет GitHub Release | Push тег `v*` или `--version` |
@@ -322,7 +336,8 @@ Bouncer/
 ├── src/
 ├── config.example.toml
 ├── systemd/
-├── examples/nftables/
+├── docs/NFTABLES.md
+├── examples/nftables/    # setup.nft, bouncer.nft (set-only)
 ├── docs/GITHUB.ru.md     # инструкция GitHub
 ├── docs/GITHUB.en.md
 ├── CHANGELOG.md
