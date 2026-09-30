@@ -14,16 +14,14 @@ env:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-musl
             asset: bouncer-linux-amd64
-          - runner: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
+          - target: aarch64-unknown-linux-musl
             asset: bouncer-linux-arm64
-            cross: true
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -32,17 +30,14 @@ jobs:
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
-      - name: Install cross toolchain
-        if: matrix.cross
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Install cross
+        uses: taiki-e/install-action@cross
 
-      - name: Build release binary
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build release binary (static musl)
+        run: cross build --release --target ${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -76,6 +71,13 @@ jobs:
           cp artifacts/bouncer-linux-arm64/bouncer dist/bouncer-linux-arm64
           chmod 755 dist/*
           ls -la dist/
+
+      - name: Verify static musl binaries
+        run: |
+          file dist/bouncer-linux-amd64
+          file dist/bouncer-linux-arm64
+          ldd dist/bouncer-linux-amd64 2>&1 | grep -q 'not a dynamic executable'
+          ldd dist/bouncer-linux-arm64 2>&1 | grep -q 'not a dynamic executable'
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

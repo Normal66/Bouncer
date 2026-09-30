@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [1.1.2] - 2026-09-30
+
+### Changed
+
+- Release CI: static **musl** binaries via `cross` (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`); CI checks amd64 musl build on every push/PR
+
+### Documentation
+
+- README (EN/RU): log directory ACL when tailer gets access denied (rotation-safe default ACL)
+- README (EN/RU): release binaries are static musl; note for older glibc-linked releases
+- [docs/GITHUB.ru.md](docs/GITHUB.ru.md), [docs/GITHUB.en.md](docs/GITHUB.en.md): repo-local git author; step-by-step if **cursor** still appears in Contributors (`git filter-repo`, tags, cache)
+
 ## [1.1.1] - 2026-09-12
 
 ### Fixed
@@ -51,6 +65,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 curl -fsSL https://raw.githubusercontent.com/Normal66/Bouncer/main/install.sh | sudo bash
 ```
 
+[1.1.2]: https://github.com/Normal66/Bouncer/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Normal66/Bouncer/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Normal66/Bouncer/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Normal66/Bouncer/releases/tag/v1.0.0

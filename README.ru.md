@@ -70,6 +70,8 @@
 - Rust **1.85+**
 - Caddy или NGINX с access log в файлах
 
+**Бинарники из GitHub Release** (актуальный CI) — **статическая сборка musl** (`cross`, `*-unknown-linux-musl`), без привязки к glibc дистрибутива; подходят для **Debian 12**, Ubuntu и других Linux x86_64/arm64. Старые релизы до перехода на musl могли давать `GLIBC_… not found` — обновите release или соберите на сервере ([ручная установка](#ручная-установка)).
+
 ---
 
 ## Быстрый старт (copy-paste)
@@ -106,6 +108,8 @@ curl -fsSL .../install.sh | sudo bash -s -- --skip-nft
 ```
 
 После проверки установите `dry_run = false` в конфиге и `systemctl restart bouncer`.
+
+Если `install.sh` падает после скачивания бинарника или `bouncer` не стартует — см. [Troubleshooting](#troubleshooting).
 
 ---
 
@@ -248,7 +252,7 @@ sudo systemctl enable --now bouncer
 sudo journalctl -u bouncer -f
 ```
 
-Unit содержит `SupplementaryGroups=caddy` — root читает логи Caddy (`640`).
+Unit содержит `SupplementaryGroups=caddy` — root читает логи Caddy (`640`). Если в journal всё равно `access denied` при чтении лога (часто после ротации или нестандартных прав на каталог), настройте ACL — см. [Troubleshooting](#troubleshooting).
 
 ---
 
@@ -313,18 +317,31 @@ RUST_LOG=bouncer=debug bouncer run
 |---------|---------|---------|
 | Set `blocked_ips` пуст | Нет новых событий после старта | Норма; подождать или снизить `threshold` |
 | Много 404 в файле, банов нет | Tail только с EOF | Только новые строки |
-| `failed to open` log | Права / sandbox | `SupplementaryGroups=caddy` в unit |
+| `failed to open` / `access denied` log | Права на каталог или новый файл после ротации | `SupplementaryGroups=caddy` в unit; при необходимости ACL ниже |
 | Бан не блокирует | `drop` после accept `:22/:443` | `ip saddr @blocked_ips drop` **сразу после** `established,related accept` |
 | Повторный `IP banned` для того же IP | Новые строки journal после бана | С v1.1.1 в лог пишется только **первый** бан; смотрите `nft list set` |
 | Забанили себя | Свои probe-запросы или опечатки SSH | IP в `[whitelist].ips` |
 | SSH-бан не срабатывает | Мало попыток после старта | Снизить `[ssh].threshold`; проверить `journalctl -u ssh` |
 | `install.sh` — ошибка download | Нет GitHub Release | Push тег `v*` или `--version` |
+| Бинарник не запускается, `GLIBC_… not found` | Старый release (dynamic glibc) | Обновите до последнего GitHub Release (musl) или `cargo build --release` на сервере |
 | `no sites detected` | Нестандартные пути логов | `--site URL --log PATH` |
 
 ```bash
 sudo nft list set inet filter blocked_ips
 sudo journalctl -u bouncer | grep banned
 ```
+
+**ACL для каталога логов** (тот же приём для любого `log_path` из `config.toml`, подставьте каталог):
+
+```bash
+LOG_DIR="/var/log/caddy"
+sudo setfacl -R -m u:root:rx "$LOG_DIR"
+sudo setfacl -R -m u:root:r "$LOG_DIR"/*
+sudo setfacl -R -d -m u:root:r "$LOG_DIR"
+sudo setfacl -d -m u:root:rx "$LOG_DIR"
+```
+
+`default ACL` нужен, чтобы после ротации Caddy/NGINX новые файлы оставались читаемыми для процесса bouncer (`User=root`).
 
 ---
 

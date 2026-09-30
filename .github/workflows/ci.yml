@@ -17,6 +17,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
 
       - uses: Swatinem/rust-cache@v2
 
@@ -31,3 +32,9 @@ jobs:
 
       - name: release build
         run: cargo build --release
+
+      - name: musl release build (linux amd64)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          cargo build --release --target x86_64-unknown-linux-musl

@@ -77,6 +77,8 @@ There is no legitimate reason to try random usernames on a production server.
 - Rust **1.85+** (edition 2024) to build
 - Caddy or NGINX writing access logs to files readable by the daemon
 
+**GitHub Release binaries** (current CI) are **static musl** builds (`cross`, `*-unknown-linux-musl`) with no glibc version requirement — suitable for **Debian 12**, Ubuntu, and other Linux amd64/arm64 hosts. Older releases before the musl switch may show `GLIBC_… not found`; upgrade the release or build on the server ([Manual install](#manual-install)).
+
 ---
 
 ## Quick start (copy-paste)
@@ -113,6 +115,8 @@ curl -fsSL .../install.sh | sudo bash -s -- --skip-nft
 ```
 
 After install, set `dry_run = false` in `/etc/bouncer/config.toml` and run `systemctl restart bouncer` when ready.
+
+If `install.sh` fails after downloading the binary, or `bouncer` will not start, see [Troubleshooting](#troubleshooting).
 
 ---
 
@@ -275,7 +279,7 @@ sudo systemctl enable --now bouncer
 sudo journalctl -u bouncer -f
 ```
 
-The unit uses `SupplementaryGroups=caddy` so root can read Caddy log files (`640`).
+The unit uses `SupplementaryGroups=caddy` so root can read Caddy log files (`640`). If journal still shows **access denied** when tailing logs (often after rotation or tight directory permissions), set filesystem ACL — see [Troubleshooting](#troubleshooting).
 
 ---
 
@@ -350,13 +354,14 @@ RUST_LOG=bouncer=debug bouncer run
 |---------|-------|-----|
 | Empty `blocked_ips` set | No new qualifying traffic since start | Normal; wait for scanners or lower `threshold` |
 | Empty set, many 404s in file | Tailer reads **from EOF only** | Expected; only new lines count |
-| `failed to open` log file | Permissions / systemd sandbox | Use `SupplementaryGroups=caddy` (see unit) |
+| `failed to open` / `access denied` log file | Directory permissions or new file after rotation | `SupplementaryGroups=caddy` (see unit); ACL below if needed |
 | Ban not blocking traffic | Drop rule after accept `:22/:443` | Add `ip saddr @blocked_ips drop` right after `established,related accept` |
 | Repeated `IP banned` for same IP | New sshd/journal lines after ban | Normal since v1.1.1: only **first** ban is logged; check `nft list set` |
 | Your IP banned | Admin traffic or SSH typos | Add IP to `[whitelist].ips` |
 | SSH ban not triggering | Too few attempts after start | Lower `[ssh].threshold`; check `journalctl -u ssh` |
 | SSH unit not found | Wrong unit name on distro | Debian/Ubuntu: `ssh`; RHEL/Fedora: `sshd` |
 | `install.sh` fails on download | No GitHub Release yet | Push tag `v*` or pass `--version` |
+| Binary won't run, `GLIBC_… not found` | Older release (dynamic glibc) | Install latest GitHub Release (musl) or `cargo build --release` on the server |
 | `no sites detected` | Non-standard log paths | `--site URL --log PATH` |
 
 Check bans:
@@ -365,6 +370,18 @@ Check bans:
 sudo nft list set inet filter blocked_ips
 sudo journalctl -u bouncer | grep banned
 ```
+
+**Log directory ACL** (same for any `log_path` in `config.toml`; use the log file’s parent directory):
+
+```bash
+LOG_DIR="/var/log/caddy"
+sudo setfacl -R -m u:root:rx "$LOG_DIR"
+sudo setfacl -R -m u:root:r "$LOG_DIR"/*
+sudo setfacl -R -d -m u:root:r "$LOG_DIR"
+sudo setfacl -d -m u:root:rx "$LOG_DIR"
+```
+
+Default ACL keeps **new** files readable after Caddy/NGINX log rotation (bouncer runs as `User=root`).
 
 ---
 

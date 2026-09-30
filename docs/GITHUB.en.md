@@ -56,6 +56,69 @@ git status
 
 Ensure `.gitignore` excludes `target/`, secrets, and server-specific configs.
 
+### Commit author: keep **cursor** out of Contributors
+
+GitHub **Contributors** lists every distinct `user.name` / email in history. Commits made with Cursor’s default identity add **cursor** to that list.
+
+Before any commit, set identity **for this repo only**:
+
+```bash
+git config user.name "YOUR_NAME"
+git config user.email "your@email.com"
+git config --get user.name
+git config --get user.email
+```
+
+Prefer a GitHub noreply address. In Cursor, confirm commits use your name before push.
+
+If **cursor** is already a contributor, rewrite those commits and update `main` (see **Still seeing cursor** below).
+
+#### Still seeing cursor in Contributors
+
+The graph uses commits on the **default branch** (`main`). One commit authored as `cursor` keeps the avatar until history is rewritten.
+
+**1. Find cursor commits (all refs):**
+
+```bash
+git fetch --all --tags --prune
+git log --all --format="%an <%ae>" | sort -u
+git log --all --regexp-ignore-case --extended-regexp --author='cursor|cursoragent' --oneline
+```
+
+**2. Match remote `main`:**
+
+```bash
+git log origin/main --regexp-ignore-case --extended-regexp --author='cursor|cursoragent' --oneline
+```
+
+If empty locally but the site still shows cursor: confirm repo/branch on **Insights → Contributors**, wait **24–72 h** for cache, or contact GitHub Support.
+
+**3. Many commits — `git filter-repo`:**
+
+```bash
+pip install git-filter-repo
+git clone https://github.com/Normal66/Bouncer.git bouncer-rewrite && cd bouncer-rewrite
+
+git filter-repo --force --name-callback '
+    if name.lower() in (b"cursor", b"cursor agent"):
+        return b"YOUR_NAME"
+    return name
+' --email-callback '
+    if b"cursor" in email.lower():
+        return b"your@email.com"
+    return email
+'
+
+git remote add origin https://github.com/Normal66/Bouncer.git
+git push --force-with-lease origin main
+```
+
+Update tags if needed: `git push --force-with-lease origin --tags`
+
+**4. Latest commit only:** `git commit --amend --author="YOUR_NAME <your@email.com>" --no-edit` then `git push --force-with-lease origin main`.
+
+**5. Feature branches** do not affect Contributors until merged into `main`.
+
 ---
 
 ## Step 3. First commit
@@ -162,6 +225,8 @@ gh release create v1.0.0 --title "v1.0.0 — SSH ban + one-line installer" --not
 ## Step 8. CI
 
 `.github/workflows/ci.yml` runs on push/PR: fmt, clippy, test, release build.
+
+Release workflow (`.github/workflows/release.yml`) uses **cross** to build static **musl** binaries for amd64 and arm64; the job verifies they are not dynamically linked before publishing.
 
 Check the **Actions** tab after pushing.
 

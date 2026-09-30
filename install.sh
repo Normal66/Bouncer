@@ -42,6 +42,9 @@ Options:
 
 Environment:
   BOUNCER_REPO, BOUNCER_VERSION, BOUNCER_BIN, BOUNCER_CONFIG_DIR
+
+Note: current release binaries are static musl (Debian 12+ friendly).
+Older releases may need a local cargo build — see README "Manual install".
 EOF
 }
 
